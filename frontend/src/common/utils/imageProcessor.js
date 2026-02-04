@@ -1,3 +1,4 @@
+import imageCompression from "browser-image-compression";
 
 export async function resizeImage(blob, maxWidth = 1024) {
   const img = document.createElement("img");
