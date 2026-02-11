@@ -1,9 +1,9 @@
 /* ===== Profile Page Container ===== */
 .container {
   width: 100%;
-  max-width: 420px;
+  max-width: 430px;
   min-height: calc(100vh - 106px);
-  padding: 40px 20px;
+  padding: 16px 12px;
   box-sizing: border-box;
   background: #F5F5F5 !important; /* 아주 연한 웜그레이 */
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
@@ -20,11 +20,11 @@
 }
 
 .grid {
-  max-width: 420px;
+  max-width: 430px;
   margin: 0 auto;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 24px;
+  gap: 12px;
   align-items: start;
 }
 
@@ -35,27 +35,27 @@
   align-items: center;
   min-height: 60vh;
   color: #333333; /* 다크 그레이 */
-  font-size: 15px;
+  font-size: 13px;
 }
 
 .loading p {
   margin: 0;
-  padding: 18px 36px;
+  padding: 12px 20px;
   background-color: #FFFFFF;
   border: 1px solid #81C784; /* 라이트 그린 */
-  border-radius: 12px;
+  border-radius: 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* ===== Error Message ===== */
 .error {
-  margin: 0 0 24px 0;
-  padding: 14px 18px;
+  margin: 0 0 12px 0;
+  padding: 12px 14px;
   background: #FFFFFF;
   border: 1px solid #D32F2F; /* 레드 - 위험/주의 */
-  border-radius: 10px;
+  border-radius: 8px;
   color: #D32F2F; /* 레드 텍스트 */
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }

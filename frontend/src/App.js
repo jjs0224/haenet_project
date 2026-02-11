@@ -1,4 +1,3 @@
-import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./styles/common.css";
 
@@ -6,6 +5,7 @@ import AppProviders from "./app/AppProviders";
 import Header from "./components/layout/Header";
 import BottomNav from "./components/layout/BottomNav";
 import ProtectedRoute from "./components/common/ProtectedRoute";
+import ScrollToTop from "./components/common/ScrollToTop";
 
 import Home from "./pages/Home";
 import ResultPage from "./pages/menuscan/ResultPage";
@@ -16,7 +16,6 @@ import EditProfile from "./pages/member/EditProfile";
 
 import CommunityDetail from "./pages/community/CommunityDetail";
 import CommunityCreate from "./pages/community/CommunityCreate";
-// import CommunityEdit from "./pages/community/CommunityEdit";
 import Community from "./pages/community/Community";
 
 import ReviewList from "./pages/review/ReviewList";
@@ -25,7 +24,6 @@ import ReviewCreate from "./pages/review/ReviewCreate";
 import ReviewEdit from "./pages/review/ReviewEdit";
 
 // test
-import CameraUploadPage from "./pages/menuscan/CameraUploadPage";
 import Register from "./pages/auth/Register";
 
 // admin 추가
@@ -35,14 +33,15 @@ export default function App() {
   return (
     <AppProviders>
       <BrowserRouter>
+        <ScrollToTop />
         <Header />
 
         <main className="app-main">
         <Routes>
           {/* 공개 페이지 (로그인 불필요) */}
           <Route path="/" element={<Home />} />
-          <Route path="/result" element={<ResultPage />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/result" element={<ResultPage />} />
           <Route path="/register" element={<Register />} />
 
           {/* 커뮤니티 - 목록/상세 공개, 작성/수정은 로그인 필수 */}
@@ -87,15 +86,6 @@ export default function App() {
           />
 
 
-          {/* upload */}
-          <Route
-            path="/menu/upload"
-            element={
-              <ProtectedRoute>
-                <CameraUploadPage />
-              </ProtectedRoute>
-            }
-          />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

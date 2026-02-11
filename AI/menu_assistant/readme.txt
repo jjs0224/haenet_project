@@ -20,11 +20,11 @@ python -m menu_assistant.worker.worker_app.pipeline.steps.step_02_ocr ^
   --vis   menu_assistant/data/runs/20260112_181356/ocr/ocr_vis.jpg
 
 # 3) normalize 실행
-python -m menu_assistant.worker.worker_app.pipeline.steps.step_03_normalize --runs-root "C:\Users\201\Desktop\PGHfolder\Final_project\AI\menu_assistant\data\runs" --run-id 20260112_181356
+python -m menu_assistant.worker.worker_app.pipeline.steps.step_03_normalize --runs-root "C:\Users\201\Desktop\PGHfolder\haenet\uploads\tmp\menu\7242a839300e4f3a8c8dd99a8509b48d\ai_runs" --run-id 7242a839300e4f3a8c8dd99a8509b48d
 
 # 4) rag match 메뉴명만 선매칭
 python -m menu_assistant.worker.worker_app.pipeline.steps.step_04_rag_match ^
-  --run_id 20260113_121958 ^
+  --run_id 7242a839300e4f3a8c8dd99a8509b48d ^
   --top_k 20 ^
   --rerank_top_k 5 ^
   --use_rerank
@@ -39,4 +39,12 @@ python menu_assistant/data/datasets/raw/reduce_Dataset.py ^
   --mapping_out "C:\Users\201\Desktop\PGHfolder\Final_project\AI\menu_assistant\data\datasets\raw\menu_representatives_250_mapping.json" ^
   --target_n 250
 """
+
+python -m menu_assistant.worker.worker_app.pipeline.steps.step_05_risk_score ^
+  --run_id 20260204_174345 ^
+  --data_dir C:\Users\201\Desktop\PGHfolder\haenet\AI\menu_assistant\data ^
+  --run_dir C:\Users\201\Desktop\PGHfolder\haenet\AI\menu_assistant\data\runs\20260204_174345 ^
+  --user_profile_json C:\Users\201\Desktop\PGHfolder\haenet\upload\user_profile_mock.json ^
+  --require_poly
+
 

@@ -1,357 +1,257 @@
-# menu_assistant/worker/worker_app/services/schema.py
+# menu_assistant/worker/worker_app/llm/services/schema.py
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Literal, Optional, Tuple
-
-# ============================================================
-# Constants / Types
-# ============================================================
-# - SchemaVersion: LLM/서비스 출력 스키마 버전 관리용
-#   * v1만 허용(현 시점)
-# - RiskLevel: 최종 위험도 레벨 (프론트/UI에서 그대로 사용하기 쉬운 문자열)
-SchemaVersion = Literal["v1"]
-RiskLevel = Literal["OK", "CAUTION", "NO"]
-
-# ============================================================
-# Allowed ALG tags (UI/정렬 기준 고정)
-# ============================================================
-ALLOWED_ALG_TAGS = {
-    "ALG_CELERY",
-    "ALG_CEREALS_GLUTEN",
-    "ALG_CRUSTACEANS",
-    "ALG_EGGS",
-    "ALG_FISH",
-    "ALG_MILK",
-    "ALG_MOLLUSCS",
-    "ALG_MUSTARD",
-    "ALG_SESAME",
-    "ALG_SOY",
-    "ALG_TREE_NUTS",
-}
-
-# ============================================================
-# Low-level validators
-# ============================================================
-def _is_num(x: Any) -> bool:
-    """
-    숫자 판별 헬퍼.
-    - int/float는 True
-    - bool은 int의 서브클래스이므로 제외(False) 처리
-      (True/False가 좌표나 score로 들어오는 것을 방지)
-    """
-    return isinstance(x, (int, float)) and not isinstance(x, bool)
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 
-def validate_poly(poly: Any) -> Tuple[bool, str]:
-    """
-    poly 유효성 검증.
-    목적:
-      - 메뉴 항목의 bounding polygon(텍스트 영역)을 프론트에서 오버레이/하이라이트할 때
-        좌표 구조가 반드시 안정적으로 들어오도록 강제한다.
+# -----------------------------
+# Output schema (LLM -> JSON)
+# -----------------------------
 
-    poly 규칙:
-      - list of points (>=4)
-      - 각 point는 [x, y]
-      - x,y는 numeric(int/float)이어야 함
-
-    반환:
-      (True, "")  : 유효
-      (False, msg): 무효 + 원인 메시지
-    """
-    if poly is None:
-        return False, "poly is None"
-    if not isinstance(poly, list) or len(poly) < 4:
-        return False, "poly must be a list with >=4 points"
-    for i, p in enumerate(poly):
-        if not isinstance(p, list) or len(p) != 2:
-            return False, f"poly point {i} must be [x,y]"
-        if not _is_num(p[0]) or not _is_num(p[1]):
-            return False, f"poly point {i} coordinates must be numeric"
-    return True, ""
-
-
-def _require_nonempty_str(d: Dict[str, Any], key: str, path: str) -> Tuple[bool, str]:
-    """
-    필수 문자열 필드 검증 헬퍼.
-    - d[key]가 str이고 strip() 후 비어있지 않아야 통과
-    - 실패 시 'path.key missing' 형태의 에러 메시지를 반환
-
-    예:
-      _require_nonempty_str(item, "menu_name", "items[0]")
-      → menu_name이 없으면 "items[0].menu_name missing"
-    """
-    v = d.get(key)
-    if not isinstance(v, str) or not v.strip():
-        return False, f"{path}.{key} missing"
-    return True, ""
-
-
-# ============================================================
-# User Profile (optional in final output, but useful for trace)
-# ============================================================
-@dataclass
-class UserProfileV1:
-    """
-    사용자 프로필(선택):
-    - LLM 프롬프트에 포함하거나, 최종 결과에 trace/debug 목적으로 포함 가능
-    - 최종 출력에서 반드시 필요하지는 않지만, '왜 위험도가 그렇게 나왔는지' 근거 추적에 유리
-
-    필드:
-      allergy_tags: 사용자의 알러지 태그(예: ALG_MILK, ALG_PEANUTS ...)
-      avoid_foods : 비선호/회피 음식(텍스트 리스트)
-      religion    : 종교적 제한(예: halal/vegan 등과 결합될 수도 있으나 현재는 문자열)
-    """
-    allergy_tags: List[str] = field(default_factory=list)
-    avoid_foods: List[str] = field(default_factory=list)
-    religion: Optional[str] = None
-
-
-# ============================================================
-# LLM OUTPUT / FINAL OUTPUT (Front-friendly)
-# - You requested LLM output MUST include:
-#   item_id, menu_name, poly, menu_description_ko, risk_description_ko
-# - We keep the container shape stable:
-#   { schema_version, run_id, items[...] }
-# ============================================================
 @dataclass
 class LLMItemOutputV1:
-    """
-    LLM이 "메뉴 1개"에 대해 반환해야 하는 최소 단위 출력 스키마(v1)
-
-    REQUIRED (반드시 존재해야 하는 5개):
-      - item_id              : 입력과 1:1 매핑하기 위한 키(DecisionRules의 itm_0001 형태)
-      - menu_name            : 최종 메뉴명(프롬프트/후처리 공통 키)
-      - poly                 : 해당 메뉴 텍스트 영역(오버레이/하이라이트 목적)
-      - menu_description_ko  : 메뉴 설명(한국어) - 외국인용 번역/추가설명 만들 때 기반 정보
-      - risk_description_ko  : 위험도 설명(한국어) - 사용자의 알러지/종교/회피를 반영한 요약 근거
-      - comment            : 직원에게 확인할 질문(한국어, yes or no 로 대답할수있게)
-    
-    OPTIONAL (있으면 좋은 필드):
-      - risk_level     : OK / CAUTION / NO (기본 CAUTION)
-      - reason_bullets : 근거를 bullet로 분리(프론트 UI에 그대로 활용 가능)
-      - confidence     : 0~1 범위의 신뢰도(모델 응답 품질/추정치 표기)
-
-    EXTENDED OPTIONAL (프롬프트 확장용):
-      - matched_constraints : 사용자 조건과 충돌한다고 판단된 항목 요약
-          {
-            "allergy_tags": ["ALG_MILK"] or null,
-            "religion": "..." or null,
-            "avoid_foods": ["고수"] or null
-          }
-    """
-    # REQUIRED (must always exist)
+    # ✅ required
     item_id: str
-    menu_name: str
-    poly: Any
-    menu_description_ko: str
-    risk_description_ko: str
-    comment: str
+    match_status: str            # "exact" | "unknown"
+    menu_name_ko: str
+    menu_name_en: str  # ✅ NEW (Step5에서 생성, Step6에서 재번역 가능)
+    poly: List[List[float]]
 
-    # OPTIONAL but recommended
-    risk_level: RiskLevel = "CAUTION"
-    reason_bullets: List[str] = field(default_factory=list)
-    confidence: float = 0.0
-    # NOTE: dataclass level typing is optional; validator handles runtime checks
-    matched_constraints: Optional[Dict[str, Any]] = None
+    menu_description_ko: str
+    menu_description_en: str     # step6 fills; step5 can be ""
+
+    risk_description_ko: str
+    risk_description_en: str     # step6 fills; step5 can be ""
+
+    risk_difficulty: int         # 0|1|2
+
+    user_risk_match: Dict[str, Any]  # structured match info
+
+    comment_ko: str
+    comment_en: str              # step6 fills; step5 can be ""
+
+    # ✅ optional but schema-controlled
+    is_menu: Optional[str] = None            # "yes"|"no" (required when match_status=="unknown")
+    drop_reason_ko: Optional[str] = None     # required when is_menu=="no" and match_status=="unknown"
 
 
 @dataclass
 class LLMOutputV1:
-    """
-    LLM의 최종 출력 컨테이너 스키마(v1)
-
-    필드:
-      schema_version : "v1" (또는 생략 가능 - validators에서 허용, parsers에서 v1로 취급)
-      run_id         : 파이프라인 실행 단위 식별자
-      items          : LLMItemOutputV1 리스트 (메뉴 단위 출력)
-      user_profile   : 선택(trace/debug) - 사용자 조건을 최종 결과에 남기고 싶을 때 사용
-    """
-    schema_version: SchemaVersion
+    schema_version: str
     run_id: str
     items: List[LLMItemOutputV1]
-    # Optional trace: you may store user_profile here for final output
-    user_profile: Optional[UserProfileV1] = None
 
 
-# ============================================================
-# Validators (used by parsers.py)
-# ============================================================
-def validate_llm_output_v1(obj: Dict[str, Any]) -> Tuple[bool, str]:
+# -----------------------------
+# Validators
+# -----------------------------
+
+def _is_non_empty_str(x: Any) -> bool:
+    return isinstance(x, str) and x.strip() != ""
+
+
+def _is_str(x: Any) -> bool:
+    return isinstance(x, str)
+
+
+def _is_bool(x: Any) -> bool:
+    return isinstance(x, bool)
+
+
+def _is_int(x: Any) -> bool:
+    return isinstance(x, int) and not isinstance(x, bool)
+
+
+def _is_poly(x: Any) -> bool:
+    # poly: [[x,y], ...] 최소 4개 점 권장
+    if not isinstance(x, list) or len(x) < 4:
+        return False
+    for p in x:
+        if not isinstance(p, list) or len(p) != 2:
+            return False
+        if not (isinstance(p[0], (int, float)) and isinstance(p[1], (int, float))):
+            return False
+    return True
+
+
+def _nullable_list_of_str(x: Any) -> bool:
+    if x is None:
+        return True
+    if not isinstance(x, list):
+        return False
+    for v in x:
+        if not isinstance(v, str) or not v.strip():
+            return False
+    return True
+
+
+def validate_llm_output_v1(obj: Any) -> Tuple[bool, str]:
     """
-    LLM이 반환한 dict가 "정확히" v1 스키마 요건을 만족하는지 검증한다.
-
-    설계 의도:
-      - REQUIRED 필드는 엄격히 검사(누락/빈문자열/형식 오류면 실패)
-      - OPTIONAL 필드는 존재할 경우에만 타입/범위 검사(관대한 정책)
-      - schema_version은 누락 가능(파서에서 v1로 처리한다고 주석에 명시)
-
-    반환:
-      (True, "")  : 유효
-      (False, msg): 무효 + 원인 메시지
+    ✅ Strong validation:
+    - en fields are REQUIRED keys but allow empty string in Step5
+    - match_status is exact|unknown
+    - unknown must include is_menu yes|no
+    - if unknown & is_menu=no => drop_reason_ko required non-empty
+    - risk_difficulty must be 0|1|2
+    - user_risk_match must include required keys and types
     """
     if not isinstance(obj, dict):
-        return False, "LLM output must be dict"
+        return False, "Root must be a JSON object"
 
-    # schema_version: allow missing -> treated as v1 in parsers
-    sv = obj.get("schema_version")
-    if sv is not None and sv != "v1":
-        return False, "unsupported schema_version"
+    for k in ("schema_version", "run_id", "items"):
+        if k not in obj:
+            return False, f"Missing required root key: {k}"
 
-    # run_id (반드시 존재해야 하며 비어있으면 안 됨)
-    if not isinstance(obj.get("run_id"), str) or not obj["run_id"].strip():
-        return False, "run_id missing"
+    if not _is_non_empty_str(obj.get("schema_version")):
+        return False, "schema_version must be non-empty string"
 
-    # items는 list여야 함
-    if not isinstance(obj.get("items"), list):
+    if not _is_non_empty_str(obj.get("run_id")):
+        return False, "run_id must be non-empty string"
+
+    items = obj.get("items")
+    if not isinstance(items, list):
+        return False, "items must be a list"
+
+    for i, it in enumerate(items):
+        if not isinstance(it, dict):
+            return False, f"items[{i}] must be an object"
+
+        # ---- required keys (must exist) ----
+        required_keys = [
+            "item_id",
+            "match_status",
+            "menu_name_ko",
+            "menu_name_en",
+            "poly",
+            "menu_description_ko",
+            "menu_description_en",
+            "risk_description_ko",
+            "risk_description_en",
+            "risk_difficulty",
+            "user_risk_match",
+            "comment_ko",
+            "comment_en",
+        ]
+        for rk in required_keys:
+            if rk not in it:
+                return False, f"items[{i}] missing required key: {rk}"
+
+        # ---- basic types ----
+        if not _is_non_empty_str(it.get("item_id")):
+            return False, f"items[{i}].item_id must be non-empty string"
+
+        ms = it.get("match_status")
+        if ms not in ("exact", "unknown"):
+            return False, f"items[{i}].match_status must be 'exact' or 'unknown'"
+
+        if not _is_non_empty_str(it.get("menu_name_ko")):
+            return False, f"items[{i}].menu_name_ko must be non-empty string"
+
+        # ✅ menu_name_en은 Step5에서 만들지만 실패 방지를 위해 string만 강제 (빈문자 허용)
+        if not _is_str(it.get("menu_name_en")):
+            return False, f"items[{i}].menu_name_en must be string"
+
+        if not _is_poly(it.get("poly")):
+            return False, f"items[{i}].poly must be polygon [[x,y],...] with >=4 points"
+
+        # ko는 실제 내용 권장(빈문자 금지로 강제해도 되지만, 실패율이 올라가니 우선 non-empty로 유지)
+        if not _is_non_empty_str(it.get("menu_description_ko")):
+            return False, f"items[{i}].menu_description_ko must be non-empty string"
+
+        if not _is_str(it.get("menu_description_en")):
+            return False, f"items[{i}].menu_description_en must be string (can be empty in Step5)"
+
+        if not _is_non_empty_str(it.get("risk_description_ko")):
+            return False, f"items[{i}].risk_description_ko must be non-empty string"
+
+        if not _is_str(it.get("risk_description_en")):
+            return False, f"items[{i}].risk_description_en must be string (can be empty in Step5)"
+
+        rd = it.get("risk_difficulty")
+        if not _is_int(rd) or rd not in (0, 1, 2, 3):
+            return False, f"items[{i}].risk_difficulty must be int 0|1|2|3"
+
+        # ✅ 강제 규칙: unknown이면 3 고정
+        if ms == "unknown" and rd != 3:
+            return False, f"items[{i}].risk_difficulty must be 3 when match_status=='unknown'"
+
+        # ✅ 강제 규칙: exact이면 0/1/2만 허용
+        if ms == "exact" and rd == 3:
+            return False, f"items[{i}].risk_difficulty must be 0|1|2 when match_status=='exact'"
+
+        if not _is_non_empty_str(it.get("comment_ko")):
+            return False, f"items[{i}].comment_ko must be non-empty string"
+
+        if not _is_str(it.get("comment_en")):
+            return False, f"items[{i}].comment_en must be string (can be empty in Step5)"
+
+        # ---- user_risk_match structure ----
+        urm = it.get("user_risk_match")
+        if not isinstance(urm, dict):
+            return False, f"items[{i}].user_risk_match must be object"
+
+        for uk in ("allergy_tag_hits", "religion_hit", "avoid_food_hits", "has_any_match", "source"):
+            if uk not in urm:
+                return False, f"items[{i}].user_risk_match missing key: {uk}"
+
+        if not _nullable_list_of_str(urm.get("allergy_tag_hits")):
+            return False, f"items[{i}].user_risk_match.allergy_tag_hits must be list[str] or null"
+
+        rh = urm.get("religion_hit")
+        if rh is not None and not _is_non_empty_str(rh):
+            return False, f"items[{i}].user_risk_match.religion_hit must be non-empty string or null"
+
+        if not _nullable_list_of_str(urm.get("avoid_food_hits")):
+            return False, f"items[{i}].user_risk_match.avoid_food_hits must be list[str] or null"
+
+        if not _is_bool(urm.get("has_any_match")):
+            return False, f"items[{i}].user_risk_match.has_any_match must be boolean"
+
+        if urm.get("source") not in ("exact", "unknown"):
+            return False, f"items[{i}].user_risk_match.source must be 'exact' or 'unknown'"
+
+        # ---- unknown drop control ----
+        if ms == "unknown":
+            is_menu = it.get("is_menu")
+            if is_menu not in ("yes", "no"):
+                return False, f"items[{i}].is_menu required when match_status=='unknown' (yes|no)"
+
+            if is_menu == "no":
+                dr = it.get("drop_reason_ko")
+                if not _is_non_empty_str(dr):
+                    return False, f"items[{i}].drop_reason_ko required when is_menu=='no'"
+
+        # exact이면 is_menu/drop_reason_ko는 없어도 됨(있으면 값만 타입 체크)
+        if "is_menu" in it and it["is_menu"] is not None:
+            if it["is_menu"] not in ("yes", "no"):
+                return False, f"items[{i}].is_menu must be yes|no or null"
+
+        if "drop_reason_ko" in it and it["drop_reason_ko"] is not None:
+            if not _is_str(it["drop_reason_ko"]):
+                return False, f"items[{i}].drop_reason_ko must be string or null"
+
+    return True, "OK"
+
+
+def validate_llm_output_against_input_ids(obj: Dict[str, Any], expected_ids: List[str]) -> Tuple[bool, str]:
+    """
+    Ensures output contains exactly the same set of item_ids as input.
+    (Drop는 최종 finalizer에서 수행하고, LLM output은 id 1:1 유지)
+    """
+    if not isinstance(obj, dict) or "items" not in obj:
+        return False, "Missing items in output"
+
+    out_items = obj.get("items", [])
+    if not isinstance(out_items, list):
         return False, "items must be list"
 
-    # items 내부 각 항목을 순회하며 필수/옵션 필드 검증
-    for i, it in enumerate(obj["items"]):
-        if not isinstance(it, dict):
-            return False, f"items[{i}] must be dict"
-
-        # REQUIRED 6 fields
-        ok, msg = _require_nonempty_str(it, "item_id", f"items[{i}]")
-        if not ok:
-            return False, msg
-
-        ok, msg = _require_nonempty_str(it, "menu_name", f"items[{i}]")
-        if not ok:
-            return False, msg
-
-        # poly는 별도 정밀 검증(좌표 구조/타입)
-        ok_poly, msg_poly = validate_poly(it.get("poly"))
-        if not ok_poly:
-            return False, f"items[{i}].poly invalid: {msg_poly}"
-
-        ok, msg = _require_nonempty_str(it, "menu_description_ko", f"items[{i}]")
-        if not ok:
-            return False, msg
-
-        ok, msg = _require_nonempty_str(it, "risk_description_ko", f"items[{i}]")
-        if not ok:
-            return False, msg
-
-        ok, msg = _require_nonempty_str(it, "comment", f"items[{i}]")
-        if not ok:
-            return False, msg
-
-        # OPTIONAL fields validation
-        # risk_level: 존재하면 허용 값(OK|CAUTION|NO)인지 확인
-        if "risk_level" in it:
-            if it["risk_level"] not in ("OK", "CAUTION", "NO"):
-                return False, f"items[{i}].risk_level must be OK|CAUTION|NO"
-
-        # reason_bullets: 존재하면 list인지 확인 (None은 허용)
-        if "reason_bullets" in it and it["reason_bullets"] is not None:
-            if not isinstance(it["reason_bullets"], list):
-                return False, f"items[{i}].reason_bullets must be list"
-
-        # confidence: 존재하면 float 변환 가능 + 0~1 범위인지 확인 (None 허용)
-        if "confidence" in it and it["confidence"] is not None:
-            try:
-                c = float(it["confidence"])
-            except Exception:
-                return False, f"items[{i}].confidence must be numeric"
-            if c < 0.0 or c > 1.0:
-                return False, f"items[{i}].confidence must be 0.0~1.0"
-
-        # OPTIONAL: matched_constraints
-        # - if present, must be object or null
-        # - fields inside must be:
-        #   allergy_tags: list[str] subset of ALLOWED_ALG_TAGS OR null
-        #   religion: str OR null
-        #   avoid_foods: list[str] OR null
-        if "matched_constraints" in it:
-            mc = it.get("matched_constraints")
-            if mc is not None:
-                if not isinstance(mc, dict):
-                    return False, f"items[{i}].matched_constraints must be object or null"
-
-                # allergy_tags
-                if "allergy_tags" in mc:
-                    v = mc.get("allergy_tags")
-                    if v is not None:
-                        if not isinstance(v, list):
-                            return False, f"items[{i}].matched_constraints.allergy_tags must be list or null"
-                        for t in v:
-                            if not isinstance(t, str) or not t.startswith("ALG_"):
-                                return False, f"items[{i}].matched_constraints.allergy_tags invalid value: {t}"
-                            if t not in ALLOWED_ALG_TAGS:
-                                return False, f"items[{i}].matched_constraints.allergy_tags not allowed: {t}"
-
-                # religion
-                if "religion" in mc:
-                    v = mc.get("religion")
-                    if v is not None and not isinstance(v, str):
-                        return False, f"items[{i}].matched_constraints.religion must be string or null"
-
-                # avoid_foods
-                if "avoid_foods" in mc:
-                    v = mc.get("avoid_foods")
-                    if v is not None:
-                        if not isinstance(v, list):
-                            return False, f"items[{i}].matched_constraints.avoid_foods must be list or null"
-                        for x in v:
-                            if not isinstance(x, str):
-                                return False, f"items[{i}].matched_constraints.avoid_foods must be list[str]"
-
-    return True, ""
-
-
-# ============================================================
-# Cross-check helpers (strongly recommended in Step05)
-# ============================================================
-def validate_llm_output_against_input_ids(
-    llm_obj: Dict[str, Any],
-    expected_item_ids: List[str],
-) -> Tuple[bool, str]:
-    """
-    (권장) 입력 item_id와 LLM 출력 item_id의 정합성 검사.
-
-    목적:
-      - Step05에서 DecisionRules로 만든 items의 item_id 목록과
-        LLM이 실제로 반환한 items의 item_id 목록이 "동일"해야
-        후속 단계(오버레이/저장/사용자 노출)가 안전해진다.
-
-    정책:
-      - 누락(missing) 있으면 실패
-      - 추가(extra) 있으면 실패
-      - 순서(order)는 보지 않고, set 기반으로 "구성 동일"만 검사
-
-    반환:
-      (True, "")  : 정합
-      (False, msg): 불일치 + 원인 메시지
-    """
-    if not isinstance(llm_obj, dict) or not isinstance(llm_obj.get("items"), list):
-        return False, "llm_obj/items invalid"
-
-    # 출력에서 item_id만 수집 (dict이며 item_id가 str인 경우만)
-    out_ids: List[str] = []
-    for it in llm_obj["items"]:
+    out_ids = []
+    for it in out_items:
         if isinstance(it, dict) and isinstance(it.get("item_id"), str):
             out_ids.append(it["item_id"])
 
-    exp_set = set(expected_item_ids)
-    out_set = set(out_ids)
+    if sorted(out_ids) != sorted(expected_ids):
+        return False, f"Output item_ids mismatch. expected={sorted(expected_ids)} got={sorted(out_ids)}"
 
-    missing = sorted(exp_set - out_set)
-    extra = sorted(out_set - exp_set)
-
-    if missing:
-        return False, f"LLM output missing item_id(s): {missing}"
-    if extra:
-        return False, f"LLM output has unexpected item_id(s): {extra}"
-
-    return True, ""
-
-
-# Convenience
-def to_dict(obj: Any) -> Dict[str, Any]:
-    """
-    dataclass 인스턴스를 dict로 변환하는 편의 함수.
-    - 내부적으로 dataclasses.asdict 사용
-    - LLMOutputV1 / LLMItemOutputV1 / UserProfileV1 등 직렬화에 활용
-    """
-    return asdict(obj)
+    return True, "OK"

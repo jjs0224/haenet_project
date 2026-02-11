@@ -2,11 +2,11 @@
 .RegisterPage {
   width: 100%;
   min-height: calc(100vh - 106px);
-  padding: 40px 20px;
+  padding: 20px 16px;
   box-sizing: border-box;
   background: #F5F5F5 !important;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  max-width: 420px;
+  max-width: 430px;
   margin: 0 auto;
   position: relative;
   display: flex;
@@ -22,12 +22,12 @@ body:has(.RegisterPage) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 32px;
+  margin-bottom: 20px;
 }
 
 .RegisterHeader h2 {
   margin: 0;
-  font-size: 32px;
+  font-size: 22px;
   font-weight: 700;
   color: #333333;
 }
@@ -36,7 +36,7 @@ body:has(.RegisterPage) {
   color: #2E7D32;
   text-decoration: none;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   transition: all 0.2s ease;
 }
 
@@ -46,12 +46,12 @@ body:has(.RegisterPage) {
 }
 
 .RegisterMsg {
-  padding: 14px 18px;
-  margin-bottom: 20px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 14px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-size: 13px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 .RegisterMsg.ok {
@@ -69,35 +69,35 @@ body:has(.RegisterPage) {
 .card {
   background-color: #FFFFFF;
   border: 1px solid #DDDDDD;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .RegisterForm {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding: 32px;
+  gap: 16px;
+  padding: 20px;
 }
 
 .RegisterForm .row {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .RegisterForm .row label {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   color: #333333;
 }
 
 .RegisterForm .row input,
 .RegisterForm .row select {
-  padding: 12px 16px;
+  padding: 10px 12px;
   border: 1px solid #DDDDDD;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   color: #333333 !important;
   background-color: #FFFFFF !important;
   transition: all 0.3s ease;
@@ -152,12 +152,12 @@ body:has(.RegisterPage) {
 }
 
 .checkBtn {
-  padding: 12px 20px;
+  padding: 10px 16px;
   background-color: #FFFFFF !important;
   border: 1px solid #2E7D32;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   color: #2E7D32 !important;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -183,22 +183,22 @@ body:has(.RegisterPage) {
 .RegisterDivider {
   height: 1px;
   background: linear-gradient(90deg, transparent 0%, #DDDDDD 50%, transparent 100%);
-  margin: 24px 0;
+  margin: 16px 0;
 }
 
 .RegisterSectionTitle {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .RegisterSectionTitle h3 {
-  margin: 0 0 6px 0;
-  font-size: 20px;
+  margin: 0 0 4px 0;
+  font-size: 16px;
   font-weight: 700;
   color: #333333;
 }
 
 .RegisterSectionTitle .sub {
-  font-size: 13px;
+  font-size: 12px;
   color: #666666;
   font-weight: 400;
 }
@@ -206,29 +206,29 @@ body:has(.RegisterPage) {
 .dislikesSection {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .dislikeTagsContainer {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 16px;
+  gap: 8px;
+  padding: 12px;
   background-color: #FAFAFA;
   border: 1px solid #DDDDDD;
   border-radius: 8px;
-  min-height: 60px;
+  min-height: 56px;
 }
 
 .dislikeTag {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
+  gap: 6px;
+  padding: 6px 12px;
   background: #E8F5E9;
   border: 1px solid #81C784;
-  border-radius: 20px;
-  font-size: 14px;
+  border-radius: 16px;
+  font-size: 13px;
   color: #2E7D32;
   font-weight: 500;
 }
@@ -241,14 +241,14 @@ body:has(.RegisterPage) {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   padding: 0;
   background: #dc3545;
   color: white;
   border: none;
   border-radius: 50%;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -269,21 +269,21 @@ body:has(.RegisterPage) {
 }
 
 .RegisterActions {
-  margin-top: 16px;
+  margin-top: 12px;
   display: flex;
-  gap: 12px;
+  gap: 10px;
 }
 
 .RegisterActions button {
   flex: 1;
-  padding: 14px 24px;
+  padding: 12px 16px;
   border: none;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .RegisterActions button[type="button"]:first-child {
@@ -323,10 +323,10 @@ body:has(.RegisterPage) {
 
 .infoBox,
 .errorBox {
-  padding: 14px 18px;
+  padding: 12px 14px;
   border-radius: 8px;
-  margin: 16px 0;
-  font-size: 14px;
+  margin: 12px 0;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -343,11 +343,11 @@ body:has(.RegisterPage) {
 }
 
 .miniBtn {
-  padding: 8px 16px;
+  padding: 7px 14px;
   background-color: #FFFFFF;
   border: 1px solid #2E7D32;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 12px;
   color: #2E7D32;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -376,25 +376,3 @@ body:has(.RegisterPage) {
   box-shadow: 0 4px 12px rgba(46, 125, 50, 0.4);
 }
 
-@media (max-width: 768px) {
-  .RegisterPage {
-    padding: 24px 16px;
-  }
-
-  .RegisterHeader h2 {
-    font-size: 26px;
-  }
-
-  .RegisterForm {
-    padding: 24px;
-    gap: 20px;
-  }
-
-  .RegisterActions {
-    flex-direction: column;
-  }
-
-  .RegisterActions button {
-    width: 100%;
-  }
-}

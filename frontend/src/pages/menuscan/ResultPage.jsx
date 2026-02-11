@@ -122,18 +122,29 @@ function ResultContent({ result }) {
   const imageUrl = result?.result_image_url || normalized?.imageDataUrl;
   const resolvedImageSrc = !imgBroken ? imageUrl : (normalized?.imageDataUrl || imageUrl);
 
-  const jsonText = (() => {
-    try { return JSON.stringify(result ?? {}, null, 2); }
-    catch (e) { return String(result); }
-  })();
+  // const jsonText = (() => {
+  //   try { return JSON.stringify(result ?? {}, null, 2); }
+  //   catch (e) { return String(result); }
+  // })();
 
   const getItemLabel = (item) =>
     item?.menu?.menu_name_en || item?.menu?.menu_name_ko || item?.menu_name_en || item?.menu_name_ko || "(no name)";
 
+  // risk_difficulty 기반 테두리 색상
+  const getBorderColor = (item) => {
+    const riskDifficulty = item?.risk_difficulty ?? item?.risk?.risk_difficulty ?? null;
+    const n = Number(riskDifficulty);
+    if (n === 3) return "#9ca3af"; // gray
+    if (n === 2) return "#ef4444"; // red
+    if (n === 1) return "#f97316"; // orange
+    if (n === 0) return "#16a34a"; // green
+    return "#9ca3af"; // default gray
+  };
+
   return (
     <div className="rp-container">
       {/* 다시 분석하기 버튼 */}
-      <button className="rp-back-btn" onClick={() => navigate("/")}>다시 분석하기</button>
+      <button className="rp-back-btn" onClick={() => navigate("/")}>Reanalyzing</button>
 
       {/* 결과 이미지 + PolygonOverlay */}
       <div className="rp-image-wrap">
@@ -169,11 +180,13 @@ function ResultContent({ result }) {
           <h3 className="rp-menu-title">Detected menus / choose the menu</h3>
           <div className="rp-menu-grid">
             {items.map((it, idx) => (
-              <div key={it?.id || it?.item_id || idx} className="rp-menu-card">
+              <div
+                key={it?.id || it?.item_id || idx}
+                className="rp-menu-card"
+                style={{ borderColor: getBorderColor(it) }}
+                onClick={() => setSelectedItem(it)}
+              >
                 <div className="rp-menu-name">{getItemLabel(it)}</div>
-                <button className="rp-menu-btn" onClick={() => setSelectedItem(it)}>
-                  View English details
-                </button>
               </div>
             ))}
           </div>

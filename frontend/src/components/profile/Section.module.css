@@ -2,9 +2,9 @@
 .section {
   background-color: #FFFFFF; /* 흰색 배경 */
   border: 1px solid #DDDDDD;
-  border-radius: 16px;
-  padding: 24px;
-  margin-bottom: 32px;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -13,14 +13,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
   border-bottom: 1px solid #DDDDDD;
 }
 
 .title {
   margin: 0;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
   color: #333333; /* 다크 그레이 */
 }
@@ -28,7 +28,7 @@
 .link {
   color: #2E7D32; /* 딥 그린 */
   text-decoration: none;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   transition: all 0.2s ease;
 }
@@ -40,52 +40,52 @@
 
 /* ===== Loading State ===== */
 .loading {
-  margin: 10px 0;
+  margin: 8px 0;
   text-align: center;
   color: #666666; /* 미디엄 그레이 */
-  font-size: 14px;
+  font-size: 12px;
 }
 
 /* ===== Error Box ===== */
 .errorBox {
-  margin: 10px 0;
-  padding: 10px;
+  margin: 8px 0;
+  padding: 8px;
   border: 1px solid #D32F2F; /* 레드 */
   background: #FFEBEE; /* 연한 레드 배경 */
   border-radius: 8px;
   color: #D32F2F; /* 레드 텍스트 */
-  font-size: 14px;
+  font-size: 12px;
 }
 
 /* ===== Empty State ===== */
 .emptyState {
   text-align: center;
-  padding: 60px 20px;
+  padding: 40px 16px;
   color: #999999; /* 라이트 그레이 */
 }
 
 .emptyIcon {
-  font-size: 48px;
-  margin: 0 0 12px 0;
+  font-size: 36px;
+  margin: 0 0 8px 0;
   opacity: 0.6;
 }
 
 .emptyText {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 /* ===== Item List ===== */
 .itemList {
   display: grid;
-  gap: 16px;
+  gap: 10px;
 }
 
 .item {
   display: block;
-  padding: 18px;
+  padding: 12px;
   border: 1px solid #DDDDDD;
-  border-radius: 12px;
+  border-radius: 10px;
   text-decoration: none;
   color: inherit;
   transition: all 0.3s ease;
@@ -100,15 +100,15 @@
 }
 
 .itemTitle {
-  margin: 0 0 10px 0;
-  font-size: 16px;
+  margin: 0 0 6px 0;
+  font-size: 14px;
   font-weight: 600;
   color: #333333; /* 다크 그레이 */
 }
 
 .itemContent {
-  margin: 0 0 12px 0;
-  font-size: 14px;
+  margin: 0 0 8px 0;
+  font-size: 12px;
   color: #666666; /* 미디엄 그레이 */
   overflow: hidden;
   text-overflow: ellipsis;
@@ -118,7 +118,7 @@
 .itemFooter {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: 11px;
   color: #999999; /* 라이트 그레이 */
 }
 
@@ -127,18 +127,18 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 10px;
-  margin-top: 24px;
+  gap: 6px;
+  margin-top: 16px;
 }
 
 .pageButton {
-  padding: 10px 16px;
+  padding: 8px 12px;
   border: 1px solid #DDDDDD;
   background-color: #FFFFFF;
   color: #333333; /* 다크 그레이 */
   border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   transition: all 0.3s ease;
 }
@@ -179,28 +179,4 @@
 .communityItem:hover {
   border-color: #81C784; /* 라이트 그린 */
   background-color: #F1F8E9; /* 아주 연한 그린 */
-}
-
-/* ===== Responsive Design ===== */
-@media (max-width: 768px) {
-  .section {
-    padding: 20px;
-    margin-bottom: 24px;
-  }
-
-  .title {
-    font-size: 18px;
-  }
-
-  .item {
-    padding: 16px;
-  }
-
-  .itemTitle {
-    font-size: 15px;
-  }
-
-  .itemContent {
-    font-size: 13px;
-  }
 }

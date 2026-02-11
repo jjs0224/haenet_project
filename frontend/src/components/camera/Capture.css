@@ -1,0 +1,44 @@
+.capture-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* preview */
+
+.preview-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.preview-image {
+  flex: 1;
+  object-fit: contain;
+  background: black;
+}
+
+.preview-controls {
+  display: flex;
+  justify-content: space-around;
+  padding: 12px;
+}
+
+/* upload fallback */
+
+.upload-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+/* inline upload */
+
+.upload-inline {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}

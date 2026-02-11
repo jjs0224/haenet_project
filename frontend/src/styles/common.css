@@ -1,28 +1,47 @@
-/* ===== Global Reset & Base Styles ===== */
+/* ===== Global Reset & Base Styles (iPhone 16 Pro Max Optimized) ===== */
 * {
   box-sizing: border-box;
 }
 
-body {
+html, body {
   margin: 0;
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+  font-size: 14px; /* 모바일 기본 폰트 크기 */
 }
 
-/* ===== Scrollbar Styling (전역) ===== */
+body {
+  display: flex;
+  justify-content: center;
+  background-color: #f0f0f0;
+}
+
+#root {
+  width: 100%;
+  max-width: 430px; /* iPhone 16 Pro Max 너비 */
+  min-height: 100vh;
+  background-color: #ffffff;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+/* ===== Scrollbar Styling (모바일 최적화) ===== */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 6px; /* 모바일에서 더 얇게 */
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.05);
-  border-radius: 5px;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
   background: rgba(102, 126, 234, 0.5);
-  border-radius: 5px;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -30,22 +49,14 @@ body {
 }
 
 /* ===================================================================
-   app-main  —  Header(sticky) 아래 · BottomNav(fixed) 위의 본문 영역
-   모든 페이지에 동일하게 적용되는 전역 래퍼
-   Header 높이 ≈ 52px  →  padding-top: 60px (여유분 포함)
-   BottomNav 높이 = 70px →  padding-bottom: 80px (여유분 포함)
+   app-main  —  Header 아래 · BottomNav 위의 본문 영역
+   iPhone 16 Pro Max 최적화 (430x932px)
+   Header 높이: 56px
+   BottomNav 높이: 64px
    =================================================================== */
 .app-main {
-  padding-top: 16px;          /* Header 아래 간격 */
-  padding-bottom: 90px;       /* BottomNav 위 간격 (70px bar + 여유 20px) */
-  min-height: 100vh;
+  padding-top: 7px;          /* Header 아래 간격 */
+  padding-bottom: 76px;       /* BottomNav 위 간격 (64px bar + 여유 12px) */
+  /* min-height: 100vh; */
   box-sizing: border-box;
-}
-
-/* 모바일 (≤ 480px): BottomNav 높이가 64px로 줄어듦 */
-@media (max-width: 480px) {
-  .app-main {
-    padding-top: 12px;
-    padding-bottom: 84px;     /* 64px bar + 여유 20px */
-  }
 }

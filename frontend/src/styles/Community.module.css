@@ -1,7 +1,7 @@
 .container{
     margin: 0 auto;
-    padding: 20px;
-    max-width: 420px;
+    padding: 16px;
+    max-width: 430px;
     width: 100%;
     box-sizing: border-box;
     min-height: calc(100vh - 106px);
@@ -10,21 +10,21 @@
 }
 
 .ctn_box{
-    margin-bottom: 30px;
-    padding: 20px;
+    margin-bottom: 16px;
+    padding: 12px;
     border: 1px solid #DDDDDD;
-    border-radius: 10px;
+    border-radius: 8px;
     background: #FFFFFF;
 }
 
 .ai_img {
-    background-color: #F5F5F5; /* 아주 연한 웜그레이 */
+    background-color: #F5F5F5;
     width: 100%;
-    height: 500px;
-    border-radius: 10px;
+    height: 240px;
+    border-radius: 8px;
     text-align: center;
-    line-height: 500px;
-    font-size: 14px;
+    line-height: 240px;
+    font-size: 12px;
     color: #666666;
 }
 
@@ -58,47 +58,48 @@
 
 .icon .profile {
     display: inline-block;
-    background: #2E7D32; /* 딥 그린 */
-    width: 80px;
-    height: 80px;
-    border-radius: 40px;
+    background: #2E7D32;
+    width: 36px;
+    height: 36px;
+    border-radius: 18px;
     color: white;
     text-align: center;
-    line-height: 80px;
+    line-height: 36px;
+    font-size: 13px;
 }
 
 .comment .icon .profile{
-    width: 40px;
-    height: 40px;
-    line-height: 40px;
-    font-size: 12px;
+    width: 32px;
+    height: 32px;
+    line-height: 32px;
+    font-size: 11px;
 }
 
 .icon .nickname {
     display: inline-block;
-    font-size: 20px;
-    margin-left: 10px;
-    color: #333333; /* 다크 그레이 */
+    font-size: 14px;
+    margin-left: 8px;
+    color: #333333;
 }
 
 .comment .icon .nickname {
-    font-size: 12px;
+    font-size: 11px;
     text-align: right;
 }
 
 .comment .left {
-    font-size: 14px;
-    color: #333333; /* 다크 그레이 */
+    font-size: 12px;
+    color: #333333;
 }
 .like {
-    margin-right: 10px;
+    margin-right: 8px;
     text-align: right;
-    font-size: 15px;
+    font-size: 13px;
     color: #666666;
 }
 
 .like .text{
-    margin: 0 10px;
+    margin: 0 6px;
 }
 
 .create_img{
@@ -106,45 +107,46 @@
 }
 
 .button{
-    margin: 10px 0;
+    margin: 8px 0;
     border: none;
-    background: #2E7D32; /* 딥 그린 */
+    background: #2E7D32;
     color: #fff;
-    padding: 5px 20px;
-    border-radius: 30px;
+    padding: 8px 16px;
+    border-radius: 20px;
     cursor: pointer;
     transition: background 0.3s ease;
+    font-size: 12px;
 }
 
 .button:hover {
-    background: #1B5E20; /* 더 진한 그린 */
+    background: #1B5E20;
 }
 
 .notice{
     border: 1px solid #DDDDDD;
-    background: #F5F5F5; /* 아주 연한 웜그레이 */
-    border-radius: 10px;
-    padding: 20px;
+    background: #F5F5F5;
+    border-radius: 8px;
+    padding: 12px;
     text-align: center;
-    margin-bottom:20px;
+    margin-bottom:12px;
 }
 
 .text p{
     margin: 0;
     padding: 0;
-    font-size: 16px;
-    color: #333333; /* 다크 그레이 */
+    font-size: 13px;
+    color: #333333;
 }
 
 .text span{
-    font-size: 14px;
-    color: #666666; /* 미디엄 그레이 */
+    font-size: 12px;
+    color: #666666;
 }
 
 /* ===== 타이틀 ===== */
 .title {
     margin: 0;
-    font-size: 28px;
+    font-size: 20px;
     font-weight: 700;
     color: #333333;
 }
@@ -152,24 +154,24 @@
 /* ===== 버튼 행 (AI Image + 리뷰작성하기) ===== */
 .buttonRow {
     display: flex;
-    gap: 10px;
-    margin-bottom: 24px;
+    gap: 8px;
+    margin-bottom: 16px;
 }
 
 /* ===== 필터 행 (전체 / 내 저널) ===== */
 .filterRow {
     display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
+    gap: 6px;
+    margin-bottom: 12px;
 }
 
 .filterBtn {
     background: transparent;
     border: 1px solid #DDDDDD;
     color: #666666;
-    padding: 6px 16px;
-    border-radius: 20px;
-    font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 12px;
     cursor: pointer;
     transition: all 0.2s ease;
 }
@@ -193,13 +195,13 @@
 
 /* ===== 로그인 안내 배너 ===== */
 .loginGuideBox {
-    padding: 14px 18px;
+    padding: 12px 14px;
     background: #E8F5E9;
     border: 1px solid #81C784;
     color: #2E7D32;
     border-radius: 8px;
-    margin-bottom: 20px;
-    font-size: 15px;
+    margin-bottom: 12px;
+    font-size: 13px;
     font-weight: 600;
     text-align: center;
 }
@@ -209,8 +211,8 @@
     background: #FFFFFF;
     border: 1px solid #D32F2F;
     border-radius: 8px;
-    padding: 10px 14px;
+    padding: 10px 12px;
     color: #D32F2F;
-    font-size: 14px;
-    margin-bottom: 12px;
+    font-size: 12px;
+    margin-bottom: 10px;
 }

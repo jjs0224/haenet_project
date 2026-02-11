@@ -146,3 +146,36 @@ def update_item(db: Session, item_id: int, payload):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+
+# Category에 Item 추가
+def add_item_to_category(db: Session, category_id: int, payload):
+    # 먼저 category가 존재하는지 확인
+    c = db.get(Category, category_id)
+    if not c:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    try:
+        # 새 item 생성
+        item = Item(
+            category_id=category_id,
+            item_label_ko=payload.item_label_ko,
+            item_label_en=payload.item_label_en,
+            item_active=payload.item_active,
+        )
+        db.add(item)
+        db.commit()
+        db.refresh(item)
+
+        return {
+            "item_id": item.item_id,
+            "item_label_ko": item.item_label_ko,
+            "item_label_en": item.item_label_en,
+            "item_active": bool(item.item_active),
+            "category_id": item.category_id,
+        }
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Duplicate value (unique constraint).")
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))

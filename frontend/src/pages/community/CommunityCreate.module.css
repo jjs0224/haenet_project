@@ -1,12 +1,12 @@
 /* ===== Community Create Container ===== */
 .container {
-  padding: 30px;
-  max-width: 420px;
+  padding: 16px;
+  max-width: 430px;
   margin: 0 auto;
-  background: #FFFFFF; /* 흰색 배경 */
-  border: 1px solid #DDDDDD;
-  border-radius: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: #FFFFFF;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
   box-sizing: border-box;
   min-height: calc(100vh - 106px);
   display: flex;
@@ -14,29 +14,29 @@
 }
 
 .container h2 {
-  margin: 0 0 24px 0;
-  color: #333333; /* 다크 그레이 */
-  font-size: 24px;
+  margin: 0 0 16px 0;
+  color: #333333;
+  font-size: 18px;
   font-weight: 700;
 }
 
 /* ===== Select Review Button ===== */
 .selectButton {
-  padding: 12px 24px;
-  background: #2E7D32; /* 딥 그린 */
+  padding: 10px 20px;
+  background: #2E7D32;
   color: white;
   border: none;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 15px;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .selectButton:hover {
-  background: #1B5E20; /* 더 진한 그린 */
-  transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(46, 125, 50, 0.3);
+  background: #1B5E20;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(46, 125, 50, 0.3);
 }
 
 .selectButton:disabled {
@@ -45,16 +45,4 @@
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
-}
-
-/* ===== Responsive Design ===== */
-@media (max-width: 768px) {
-  .container {
-    padding: 20px;
-  }
-
-  .container h2 {
-    font-size: 20px;
-    margin-bottom: 20px;
-  }
 }

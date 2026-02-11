@@ -5,29 +5,26 @@ Step 05 (Runner):
 - Output:
     <run_dir>/llm/llm_input.json
     <run_dir>/llm/llm_input_meta.json
-    <run_dir>/llm/llm_prompt.txt              (optional debug)
-    <run_dir>/llm/llm_raw.txt                 (optional debug)
-    <run_dir>/llm/llm_output.json             (validated JSON)
+    <run_dir>/llm/llm_prompt*.txt              (optional debug)
+    <run_dir>/llm/llm_raw*.txt                 (optional debug)
+    <run_dir>/llm/llm_output.json             (validated JSON)  # merged across chunks if enabled
+    <run_dir>/final/final.json                ✅ NEW: finalizer merge 결과
 
-Flow:
-  rag_match.json
-    -> llm/services/decision_rules.py   (EXACT/CLOSE only, poly required, item_id assigned)
-    -> llm/services/finalizer.py        (payload normalization for LLM)
-    -> llm/prompt_builder.py            (build system+user prompt with "final JSON structure")
-    -> llm/client.py                    (Gemini 2.5 Flash call)
-    -> llm/parsers.py                   (extract JSON + schema validation; retry loop here)
-    -> save llm_output.json
-
-LLM Output Required fields per item:
-  item_id, menu_name, poly, menu_description_ko, risk_description_ko
+Speed patch (옵션):
+- --chunk_size N   : items를 N개씩 쪼개 LLM 호출 (대형 프롬프트 지연/실패 감소)
+- --workers K      : chunk 병렬 실행(제한 병렬, 기본 1)
+- --use_cache      : chunk 입력 해시 기반 캐시 사용
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def _read_json(path: Path) -> Any:
@@ -51,27 +48,39 @@ def _resolve_run_dir(data_dir: Path, run_id: str) -> Path:
     return data_dir / "runs" / run_id
 
 
-def _profile_categories_to_minimal(obj: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Convert "categories-based" profile schema to the minimal schema consumed by Step05/LLM.
+# -------------------------
+# Cache helpers (chunk-level)
+# -------------------------
 
-    Supports both:
-      - category_label_en: allergy/religion/dislike/vegan
-      - category_label_ko: 알러지/종교/싫어하는 음식/비건
+def _sha256_json(obj: Any) -> str:
+    raw = json.dumps(obj, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
 
-    Output (minimal):
-      {
-        "allergy_tags": ["ALG_PEANUT", ...],
-        "avoid_foods": ["돼지고기", ...],   # union of blocked_ingredients_ko across relevant categories
-        "religion": "islam_halal" | None
-      }
-    """
-    categories = obj.get("categories")
-    if not isinstance(categories, list):
-        # Not categories schema
+
+def _load_cache(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        obj = json.loads(path.read_text(encoding="utf-8"))
+        return obj if isinstance(obj, dict) else {}
+    except Exception:
         return {}
 
-    # Use sets for stable de-dup
+
+def _save_cache(path: Path, cache: Dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+# -------------------------
+# user profile minimalizer (same as your current)
+# -------------------------
+
+def _profile_categories_to_minimal(obj: Dict[str, Any]) -> Dict[str, Any]:
+    categories = obj.get("categories")
+    if not isinstance(categories, list):
+        return {}
+
     allergy_tags_set: set[str] = set()
     avoid_foods_set: set[str] = set()
     religion: Any = None
@@ -122,24 +131,19 @@ def _profile_categories_to_minimal(obj: Dict[str, Any]) -> Dict[str, Any]:
             for it in items:
                 if not isinstance(it, dict):
                     continue
-                # Primary: alg_tags
                 _add_values(allergy_tags_set, it.get("alg_tags"))
-                # Fallback: item_label_en (when it is an ALG_* tag)
                 ile = it.get("item_label_en")
                 if isinstance(ile, str) and ile.strip().upper().startswith("ALG_"):
                     allergy_tags_set.add(ile.strip().upper())
-                # Some profiles might store blocked_ingredients_ko even for allergies
                 _add_values(avoid_foods_set, it.get("blocked_ingredients_ko"))
 
         elif label_en == "religion":
-            # Use the first item as the active religion (MVP)
             if religion is None and items:
                 first = items[0]
                 if isinstance(first, dict):
                     religion = first.get("item_label_en") or first.get("item_label_ko") or None
                     if isinstance(religion, str):
                         religion = religion.strip() or None
-            # For safety, also include blocked ingredients as avoid_foods
             for it in items:
                 if not isinstance(it, dict):
                     continue
@@ -151,31 +155,14 @@ def _profile_categories_to_minimal(obj: Dict[str, Any]) -> Dict[str, Any]:
                     continue
                 _add_values(avoid_foods_set, it.get("blocked_ingredients_ko"))
 
-        else:
-            # Unknown category: ignore
-            continue
-
     return {
         "allergy_tags": sorted(allergy_tags_set),
         "avoid_foods": sorted(avoid_foods_set),
         "religion": religion,
     }
 
+
 def _load_user_profile(user_profile_json: str) -> Dict[str, Any]:
-    # """
-    # Step05 consumes a minimal user profile schema:
-    #
-    #   {
-    #     "allergy_tags": [...],   # e.g. ["ALG_PEANUT", "ALG_CRUSTACEANS"]
-    #     "avoid_foods": [...],    # ingredient/food tokens in Korean (or consistent tokens)
-    #     "religion": "..." | None
-    #   }
-    #
-    # However, your project also uses a richer "categories" schema.
-    # This loader supports BOTH shapes:
-    #   - If the JSON already has allergy_tags/avoid_foods/religion, it is used as-is (with defaults).
-    #   - If the JSON has a "categories" list, it is converted into the minimal schema above.
-    # """
     if not user_profile_json:
         return {"allergy_tags": [], "avoid_foods": [], "religion": None}
 
@@ -186,71 +173,198 @@ def _load_user_profile(user_profile_json: str) -> Dict[str, Any]:
     if not isinstance(obj, dict):
         raise ValueError("user_profile_json must be a JSON object (dict).")
 
-    # Common wrapper keys (front/back-end payloads often wrap the profile)
     for wrap_key in ("user_profile", "profile", "data"):
         if isinstance(obj.get(wrap_key), dict):
             obj = obj[wrap_key]
             break
 
-    # 1) If it is already minimal schema, keep it.
     if any(k in obj for k in ("allergy_tags", "avoid_foods", "religion")):
         obj.setdefault("allergy_tags", [])
         obj.setdefault("avoid_foods", [])
         obj.setdefault("religion", None)
         return obj
 
-    # 2) Convert categories schema -> minimal schema
     converted = _profile_categories_to_minimal(obj)
     if isinstance(converted, dict) and set(converted.keys()) >= {"allergy_tags", "avoid_foods", "religion"}:
         return converted
 
-    # 3) Fallback: return safe defaults
     return {"allergy_tags": [], "avoid_foods": [], "religion": None}
 
+
+# -------------------------
+# normalize items (same as your current)
+# -------------------------
+
 def _normalize_llm_input_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    Ensure LLM input item has:
-      - item_id
-      - menu_name (exact: menu, close: decided_menu)
-      - poly
-      - evidence (optional): ingredients_ko, alg_tags, menu_id
-    The LLM is instructed to COPY item_id/menu_name/poly exactly.
-    """
+    def _pick_status(it: Dict[str, Any]) -> str:
+        s4 = it.get("match_status")
+        if isinstance(s4, str) and s4.strip():
+            return s4.strip()
+        s = it.get("status")
+        if isinstance(s, str) and s.strip():
+            return s.strip()
+        m = it.get("match")
+        if isinstance(m, dict):
+            s2 = m.get("status")
+            if isinstance(s2, str) and s2.strip():
+                return s2.strip()
+        rm = it.get("rag_match")
+        if isinstance(rm, dict):
+            s3 = rm.get("status")
+            if isinstance(s3, str) and s3.strip():
+                return s3.strip()
+        return ""
+
+    def _pick_menu_name(it: Dict[str, Any], status: str) -> str:
+        for k in ("menu_name", "menu"):
+            v = it.get(k)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+        for k in ("decided_menu", "menu_final", "raw_menu_main", "raw_menu", "menu_norm"):
+            v = it.get(k)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+        m = it.get("match")
+        if isinstance(m, dict):
+            for k in ("decided_menu", "menu", "menu_name"):
+                v = m.get(k)
+                if isinstance(v, str) and v.strip():
+                    return v.strip()
+        rm = it.get("rag_match")
+        if isinstance(rm, dict):
+            for k in ("decided_menu", "used_query"):
+                v = rm.get(k)
+                if isinstance(v, str) and v.strip():
+                    return v.strip()
+        return ""
+
+    def _pick_poly(it: Dict[str, Any]) -> Any:
+        p = it.get("poly")
+        if p is not None:
+            return p
+        p2 = it.get("poly_menu")
+        if p2 is not None:
+            return p2
+        m = it.get("match")
+        if isinstance(m, dict) and m.get("poly") is not None:
+            return m.get("poly")
+        rm = it.get("rag_match")
+        if isinstance(rm, dict) and rm.get("poly") is not None:
+            return rm.get("poly")
+        return None
+
+    def _pick_evidence(it: Dict[str, Any]) -> Dict[str, Any]:
+        ev = it.get("evidence")
+        out = dict(ev) if isinstance(ev, dict) else {}
+
+        if "menu_id" not in out:
+            mid = it.get("menu_id")
+            if mid is not None:
+                out["menu_id"] = mid
+
+        if "ingredients" not in out:
+            ing = it.get("ingredients")
+            if isinstance(ing, list):
+                out["ingredients"] = ing
+
+        if "alg_tags" not in out:
+            tags = it.get("alg_tags")
+            if isinstance(tags, list):
+                out["alg_tags"] = tags
+
+        rm = it.get("rag_match")
+        if isinstance(rm, dict):
+            bm = rm.get("best_match")
+            if isinstance(bm, dict):
+                if "menu_id" not in out and bm.get("id") is not None:
+                    out["menu_id"] = bm.get("id")
+                if "ingredients" not in out and isinstance(bm.get("ingredients"), list):
+                    out["ingredients"] = bm.get("ingredients")
+                if "alg_tags" not in out and isinstance(bm.get("alg_tags"), list):
+                    out["alg_tags"] = bm.get("alg_tags")
+
+        return out
+
+
+    def _pick_menu_description_ko(it: Dict[str, Any]) -> str:
+        # Keep dataset/confirmed description if available (exact should not degrade)
+        # Priority: explicit carried field -> confirmed -> evidence
+        for k in ("menu_description_ko", "menu_description"):
+            v = it.get(k)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+
+        c = it.get("confirmed")
+        if isinstance(c, dict):
+            for k in ("menu_description_ko", "menu_description"):
+                v = c.get(k)
+                if isinstance(v, str) and v.strip():
+                    return v.strip()
+
+        ev = it.get("evidence")
+        if isinstance(ev, dict):
+            for k in ("menu_description_ko", "menu_description"):
+                v = ev.get(k)
+                if isinstance(v, str) and v.strip():
+                    return v.strip()
+
+        rm = it.get("rag_match")
+        if isinstance(rm, dict):
+            bm = rm.get("best_match")
+            if isinstance(bm, dict):
+                for k in ("menu_description_ko", "menu_description"):
+                    v = bm.get(k)
+                    if isinstance(v, str) and v.strip():
+                        return v.strip()
+
+        return ""
+
     out: List[Dict[str, Any]] = []
     for it in items:
-        status = str(it.get("status", "")).lower().strip()
+        if not isinstance(it, dict):
+            continue
+
         item_id = it.get("item_id")
-        poly = it.get("poly")
-
-        if status == "exact":
-            menu_name = it.get("menu") or it.get("menu_name")
-            evidence = {
-                "menu_id": it.get("menu_id"),
-                "ingredients_ko": it.get("ingredients_ko") or [],
-                "alg_tags": it.get("alg_tags") or [],
-            }
-        elif status == "close":
-            menu_name = it.get("decided_menu") or it.get("menu_name")
-            evidence = {
-                "menu_id": None,
-                "ingredients_ko": [],
-                "alg_tags": [],
-            }
-        else:
+        if not isinstance(item_id, str) or not item_id.strip():
             continue
 
-        if not item_id or not menu_name or poly is None:
+        status = _pick_status(it)
+        menu_name = _pick_menu_name(it, status)
+        poly = _pick_poly(it)
+        evidence = _pick_evidence(it)
+        menu_description_ko = _pick_menu_description_ko(it)
+
+        if not menu_name or poly is None:
             continue
+
+        # ✅ carry risk_difficulty computed by decision_rules (exact items may skip LLM)
+        rd_raw = it.get("risk_difficulty")
+        risk_difficulty = None
+        try:
+            if isinstance(rd_raw, bool):
+                risk_difficulty = None
+            elif isinstance(rd_raw, (int, float)):
+                risk_difficulty = int(rd_raw)
+            elif isinstance(rd_raw, str) and rd_raw.strip():
+                risk_difficulty = int(rd_raw.strip())
+        except Exception:
+            risk_difficulty = None
 
         out.append(
             {
-                "item_id": item_id,
-                "status": status,
-                "menu_name": str(menu_name),
+                "item_id": item_id.strip(),
+                "status": status or "unknown",
+                "menu_name": menu_name,
+                "menu_description_ko": menu_description_ko,
                 "poly": poly,
                 "evidence": evidence,
+                "risk_difficulty": risk_difficulty,
+                "user_risk_match": it.get("user_risk_match") if isinstance(it.get("user_risk_match"), dict) else None,
+                "comment_ko": it.get("comment_ko") if isinstance(it.get("comment_ko"), list) else None,
+                "confirmed": it.get("confirmed") if isinstance(it.get("confirmed"), dict) else None,
             }
         )
+
     return out
 
 
@@ -264,16 +378,106 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--run_dir",
-                    default = "",
-                    help = "Optional run directory override (e.g. uploads/tmp/.../ai_runs/<run_id>). "
-                     "If provided, Step05 reads/writes under this directory.",
-        )
+        default="",
+        help="Optional run directory override (e.g. uploads/tmp/.../ai_runs/<run_id>). "
+             "If provided, Step05 reads/writes under this directory.",
+    )
     p.add_argument("--user_profile_json", default="", help="Optional: path to user profile JSON")
     p.add_argument("--include_debug", action="store_true", help="Save prompt/raw snapshots")
     p.add_argument("--max_retries", type=int, default=2, help="Max retries when schema validation fails")
     p.add_argument("--require_poly", action="store_true", help="Require poly for all kept items (recommended)")
     p.add_argument("--no_require_poly", action="store_true", help="Do not require poly (debug only)")
+
+    # ✅ speed patch options (defaults keep original behavior)
+    p.add_argument("--chunk_size", type=int, default=0, help="If >0, split items into chunks of this size.")
+    p.add_argument("--workers", type=int, default=1, help="Parallel workers for chunk calls (<=4 recommended).")
+    p.add_argument("--use_cache", action="store_true", help="Enable chunk-level cache under run_dir/llm/llm_cache.json")
+
     return p.parse_args()
+
+
+def _call_llm_for_chunk(
+    *,
+    run_id: str,
+    user_profile: Dict[str, Any],
+    items_chunk: List[Dict[str, Any]],
+    llm_dir: Path,
+    include_debug: bool,
+    max_retries: int,
+    chunk_index: int,
+    cache: Optional[Dict[str, Any]],
+    cache_key: Optional[str],
+) -> Dict[str, Any]:
+    """
+    One chunk -> prompt -> LLM call -> parse/validate -> returns schema-compliant obj
+    """
+    # cache hit
+    if cache is not None and cache_key and isinstance(cache.get(cache_key), dict):
+        return cache[cache_key]
+
+    from menu_assistant.worker.worker_app.llm.prompt_builder import build_step05_prompt
+    from menu_assistant.worker.worker_app.llm.client import Gemini25FlashClient
+    from menu_assistant.worker.worker_app.llm.parsers import (
+        parse_and_validate_llm_output,
+        build_retry_prompt_from_error,
+        LLMParseError,
+    )
+    from menu_assistant.worker.worker_app.llm.services.schema import validate_llm_output_against_input_ids
+
+    expected_ids = [it["item_id"] for it in items_chunk]
+
+    prompt = build_step05_prompt(run_id=run_id, user_profile=user_profile, items=items_chunk)
+    system_msg = prompt["system"]
+    user_msg_base = prompt["user"]
+    user_msg = user_msg_base
+
+    client = Gemini25FlashClient()
+
+    last_err: str = ""
+    for attempt in range(max_retries + 1):
+        if include_debug:
+            _write_text(
+                llm_dir / f"llm_prompt.chunk{chunk_index:03d}.txt",
+                f"[SYSTEM]\n{system_msg}\n\n[USER]\n{user_msg}\n",
+            )
+
+        raw = client.generate_json(system=system_msg, user=user_msg)
+
+        if include_debug:
+            _write_text(llm_dir / f"llm_raw.chunk{chunk_index:03d}.txt", raw)
+
+        try:
+            obj = parse_and_validate_llm_output(raw)
+
+            # fallback fill (same as your current logic)
+            items_out = obj.get("items", []) or []
+            for it in items_out:
+                if not isinstance(it, dict):
+                    continue
+                if not str(it.get("menu_description_ko") or "").strip():
+                    it["menu_description_ko"] = "메뉴 설명 정보가 제한적입니다. 주문 전 구성 재료를 확인하세요."
+                if not str(it.get("risk_description_ko") or "").strip():
+                    it["risk_description_ko"] = "사용자 알러지/종교/기피 식품과의 충돌 가능성이 있어 주문 전 재료 확인이 필요합니다."
+                if not str(it.get("comment_ko") or "").strip():
+                    it["comment_ko"] = "이 메뉴에 알러지 유발 성분이나 기피 식품이 포함되나요?"
+
+            ok_ids, msg_ids = validate_llm_output_against_input_ids(obj, expected_ids)
+            if not ok_ids:
+                raise LLMParseError(msg_ids)
+
+            # cache store
+            if cache is not None and cache_key:
+                cache[cache_key] = obj
+
+            return obj
+
+        except Exception as e:
+            last_err = str(e)
+            if attempt >= max_retries:
+                break
+            user_msg = user_msg_base + "\n\n" + build_retry_prompt_from_error(last_err)
+
+    raise RuntimeError(f"[STEP05] chunk={chunk_index} invalid after retries. last_error={last_err}")
 
 
 def main() -> None:
@@ -282,10 +486,9 @@ def main() -> None:
     data_dir = Path(args.data_dir)
     run_dir = Path(args.run_dir) if str(args.run_dir or "").strip() else _resolve_run_dir(data_dir, args.run_id)
     llm_dir = run_dir / "llm"
+    final_dir = run_dir / "final"
+    final_json_path = final_dir / "final.json"
 
-    # -------------------------
-    # Load inputs
-    # -------------------------
     rag_match_path = run_dir / "rag_match" / "rag_match.json"
     if not rag_match_path.exists():
         raise FileNotFoundError(f"rag_match.json not found: {rag_match_path}")
@@ -293,9 +496,8 @@ def main() -> None:
     rag_match_json = _read_json(rag_match_path)
     user_profile = _load_user_profile(args.user_profile_json)
     print("[DEBUG] loaded user_profile:", user_profile)
-    # -------------------------
-    # Decision rules (EXACT/CLOSE only) -> minimal items
-    # -------------------------
+
+    # Decision rules -> minimal items
     from menu_assistant.worker.worker_app.llm.services.decision_rules import DecisionRules
 
     require_poly = True
@@ -304,11 +506,50 @@ def main() -> None:
     elif args.require_poly:
         require_poly = True
 
-    rules = DecisionRules(require_poly=require_poly)
+    rules = DecisionRules(require_poly=require_poly, user_profile=user_profile)
     raw_items, rules_meta = rules.build_llm_items(rag_match_json)
+    print("[DEBUG] rules_meta:", rules_meta, "raw_items_len:", len(raw_items))
 
-    # Normalize to LLM-input friendly shape (menu_name + poly always present)
+    # ✅ PATCH: bring confirmed.menu_description_ko back into raw_items (DecisionRules가 drop하는 케이스 대비)
+    confirmed_by_id: Dict[str, Dict[str, Any]] = {}
+    try:
+        src_items = rag_match_json.get("items", [])
+        if isinstance(src_items, list):
+            for src in src_items:
+                if not isinstance(src, dict):
+                    continue
+                iid = src.get("item_id")
+                c = src.get("confirmed")
+                if isinstance(iid, str) and iid.strip() and isinstance(c, dict):
+                    confirmed_by_id[iid.strip()] = c
+    except Exception:
+        confirmed_by_id = {}
+
+    for it in raw_items:
+        if not isinstance(it, dict):
+            continue
+        iid = it.get("item_id")
+        if not isinstance(iid, str) or not iid.strip():
+            continue
+        c = confirmed_by_id.get(iid.strip())
+        if isinstance(c, dict):
+            # raw_items에 confirmed를 다시 달아줌
+            it["confirmed"] = c
+            # 선택: pick 우선순위 1번(직접 필드)로도 넣어두면 더 안전
+            if not str(it.get("menu_description_ko") or "").strip():
+                it["menu_description_ko"] = str(c.get("menu_description_ko") or "").strip()
+
     llm_items = _normalize_llm_input_items(raw_items)
+
+    # ✅ B안: exact는 LLM 스킵, unknown만 LLM 호출
+    exact_items: List[Dict[str, Any]] = []
+    unknown_items: List[Dict[str, Any]] = []
+    for it in llm_items:
+        s = (it.get("status") or "").lower().strip()
+        if s == "unknown":
+            unknown_items.append(it)
+        else:
+            exact_items.append(it)
 
     llm_input_payload = {
         "schema_version": "v1",
@@ -319,82 +560,167 @@ def main() -> None:
     llm_input_meta = {
         "run_id": args.run_id,
         "decision_rules": rules_meta,
-        "kept_for_llm": len(llm_items),
+        "kept_for_llm_total": len(llm_items),
+        "kept_for_llm_unknown_only": len(unknown_items),
+        "kept_for_llm_exact_skipped": len(exact_items),
     }
 
     _write_json(llm_dir / "llm_input.json", llm_input_payload)
     _write_json(llm_dir / "llm_input_meta.json", llm_input_meta)
 
-    if not llm_items:
-        # Nothing to send to LLM; stop early
-        print(f"[STEP05] No items to send to LLM. saved: {llm_dir / 'llm_input.json'}")
+    if not unknown_items:
+        print(f"[STEP05] No unknown items to send to LLM (exact skipped). saved: {llm_dir / 'llm_input.json'}")
+        from menu_assistant.worker.worker_app.llm.services.finalizer import merge_llm_output_to_final
+
+        final_obj = merge_llm_output_to_final(
+            run_id=args.run_id,
+            user_profile=user_profile,
+            llm_input_items=llm_items,
+            llm_output_items=[],
+        )
+        _write_json(final_json_path, final_obj)
+        print(f"[STEP05] final.json        = {final_json_path}")
         return
 
-    expected_ids = [it["item_id"] for it in llm_items]
+    # -------------------------
+    # ✅ chunk / parallel / cache
+    # -------------------------
 
-    # -------------------------
-    # Build prompt
-    # -------------------------
-    from menu_assistant.worker.worker_app.llm.prompt_builder import build_step05_prompt
+    # ✅ LLM 대상은 unknown만
+    items_for_llm = unknown_items
+    chunk_size = int(args.chunk_size) if int(args.chunk_size or 0) > 0 else 0
+    workers = max(1, int(args.workers or 1))
+    use_cache = bool(args.use_cache)
 
-    prompt = build_step05_prompt(run_id=args.run_id, user_profile=user_profile, items=llm_items)
-    system_msg = prompt["system"]
-    user_msg_base = prompt["user"]
+    cache_path = llm_dir / "llm_cache.json"
+    cache: Optional[Dict[str, Any]] = _load_cache(cache_path) if use_cache else None
 
-    # -------------------------
-    # LLM call + parse/validate + retry
-    # -------------------------
-    from menu_assistant.worker.worker_app.llm.client import Gemini25FlashClient
-    from menu_assistant.worker.worker_app.llm.parsers import (
-        parse_and_validate_llm_output,
-        build_retry_prompt_from_error,
-        LLMParseError,
+    if chunk_size <= 0:
+        # ✅ original behavior: single call for all items
+        obj = _call_llm_for_chunk(
+            run_id=args.run_id,
+            user_profile=user_profile,
+            items_chunk=items_for_llm,
+            llm_dir=llm_dir,
+            include_debug=args.include_debug,
+            max_retries=int(args.max_retries),
+            chunk_index=0,
+            cache=cache,
+            cache_key=_sha256_json({"run_id": args.run_id, "user_profile": user_profile, "items": items_for_llm}),
+        )
+        merged_obj = obj
+
+    else:
+        # split into chunks
+        chunks: List[List[Dict[str, Any]]] = [
+            items_for_llm[i:i + chunk_size] for i in range(0, len(items_for_llm), chunk_size)
+        ]
+
+        t_all = time.time()
+
+        def _submit_payload(ci: int, ch: List[Dict[str, Any]]) -> Tuple[int, str]:
+            key = _sha256_json({"run_id": args.run_id, "user_profile": user_profile, "items": ch})
+            return ci, key
+
+        results_by_chunk: Dict[int, Dict[str, Any]] = {}
+
+        if workers == 1:
+            for ci, ch in enumerate(chunks):
+                _, key = _submit_payload(ci, ch)
+                t0 = time.time()
+                out = _call_llm_for_chunk(
+                    run_id=args.run_id,
+                    user_profile=user_profile,
+                    items_chunk=ch,
+                    llm_dir=llm_dir,
+                    include_debug=args.include_debug,
+                    max_retries=int(args.max_retries),
+                    chunk_index=ci,
+                    cache=cache,
+                    cache_key=key,
+                )
+                results_by_chunk[ci] = out
+                print(f"[STEP05][CHUNK] {ci+1}/{len(chunks)} size={len(ch)} took={time.time()-t0:.2f}s")
+        else:
+            # limited parallel
+            with ThreadPoolExecutor(max_workers=workers) as ex:
+                futs = []
+                for ci, ch in enumerate(chunks):
+                    _, key = _submit_payload(ci, ch)
+                    futs.append(
+                        ex.submit(
+                            _call_llm_for_chunk,
+                            run_id=args.run_id,
+                            user_profile=user_profile,
+                            items_chunk=ch,
+                            llm_dir=llm_dir,
+                            include_debug=args.include_debug,
+                            max_retries=int(args.max_retries),
+                            chunk_index=ci,
+                            cache=cache,
+                            cache_key=key,
+                        )
+                    )
+                for fut in as_completed(futs):
+                    out = fut.result()
+                    # chunk_index는 out에 없으므로, prompt/raw 파일 이름으로 추적하지 않고
+                    # 여기서는 "아이디 셋"으로 chunk를 찾는다 (안전하고 단순)
+                    out_ids = tuple(sorted([it.get("item_id") for it in (out.get("items") or []) if isinstance(it, dict)]))
+                    # find matching chunk index
+                    matched_ci = None
+                    for ci, ch in enumerate(chunks):
+                        ch_ids = tuple(sorted([it.get("item_id") for it in ch]))
+                        if ch_ids == out_ids:
+                            matched_ci = ci
+                            break
+                    if matched_ci is None:
+                        raise RuntimeError("[STEP05] parallel chunk merge failed: cannot map chunk result to chunk index")
+                    results_by_chunk[matched_ci] = out
+
+            print(f"[STEP05] chunks={len(chunks)} workers={workers} total_took={time.time()-t_all:.2f}s")
+
+        # merge chunk outputs -> one llm_output.json
+        merged_items_out: List[Dict[str, Any]] = []
+        for ci in range(len(chunks)):
+            obj = results_by_chunk[ci]
+            merged_items_out.extend(obj.get("items", []) or [])
+
+        merged_obj = {
+            "schema_version": "v1",
+            "run_id": args.run_id,
+            "items": merged_items_out,
+        }
+
+    # cache save
+    if cache is not None:
+        _save_cache(cache_path, cache)
+
+    # ✅ save llm_output.json
+    out_path = llm_dir / "llm_output.json"
+    _write_json(out_path, merged_obj)
+
+    # ✅ final.json merge
+    from menu_assistant.worker.worker_app.llm.services.finalizer import merge_llm_output_to_final
+
+    llm_output_items = merged_obj.get("items", []) or []
+    final_obj = merge_llm_output_to_final(
+        run_id=args.run_id,
+        user_profile=user_profile,
+        llm_input_items=llm_items,
+        llm_output_items=llm_output_items,
     )
-    from menu_assistant.worker.worker_app.llm.services.schema import (
-        validate_llm_output_against_input_ids,
-    )
+    _write_json(final_json_path, final_obj)
 
-    client = Gemini25FlashClient()
-
-    last_err: str = ""
-    user_msg = user_msg_base
-
-    for attempt in range(args.max_retries + 1):
-        if args.include_debug:
-            _write_text(llm_dir / "llm_prompt.txt", f"[SYSTEM]\n{system_msg}\n\n[USER]\n{user_msg}\n")
-
-        raw = client.generate_json(system=system_msg, user=user_msg)
-
-        if args.include_debug:
-            _write_text(llm_dir / "llm_raw.txt", raw)
-
-        try:
-            obj = parse_and_validate_llm_output(raw)
-
-            # Strong cross-check: output ids must match input ids
-            ok_ids, msg_ids = validate_llm_output_against_input_ids(obj, expected_ids)
-            if not ok_ids:
-                raise LLMParseError(msg_ids)
-
-            # Success
-            out_path = llm_dir / "llm_output.json"
-            _write_json(out_path, obj)
-
-            print(f"[STEP05] run_id           = {args.run_id}")
-            print(f"[STEP05] input            = {rag_match_path}")
-            print(f"[STEP05] llm_input.json    = {llm_dir / 'llm_input.json'}")
-            print(f"[STEP05] llm_output.json   = {out_path}")
-            print(f"[STEP05] items_out         = {len(obj.get('items', []))}")
-            return
-
-        except Exception as e:
-            last_err = str(e)
-            if attempt >= args.max_retries:
-                break
-            # Append retry instruction (keep same system; add follow-up constraint)
-            user_msg = user_msg_base + "\n\n" + build_retry_prompt_from_error(last_err)
-
-    raise RuntimeError(f"[STEP05] LLM output invalid after retries. last_error={last_err}")
+    print(f"[STEP05] run_id           = {args.run_id}")
+    print(f"[STEP05] input            = {rag_match_path}")
+    print(f"[STEP05] llm_input.json    = {llm_dir / 'llm_input.json'}")
+    print(f"[STEP05] llm_output.json   = {out_path}")
+    print(f"[STEP05] final.json        = {final_json_path}")
+    print(f"[STEP05] items_out         = {len(llm_output_items)}")
+    print(f"[STEP05] items_final       = {len(final_obj.get('items', []))}")
+    print(f"[STEP05] dropped_items     = {len(final_obj.get('dropped_items', []))}")
+    if args.use_cache:
+        print(f"[STEP05] llm_cache.json    = {cache_path}")
 
 
 if __name__ == "__main__":
