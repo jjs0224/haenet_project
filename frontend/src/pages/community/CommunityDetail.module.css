@@ -1,12 +1,12 @@
 /* ===== Community Detail Container ===== */
 .container {
-  padding: 30px;
-  max-width: 420px;
+  padding: 16px;
+  max-width: 430px;
   margin: 0 auto;
   width: 100%;
   background: #FFFFFF;
-  border: 1px solid #DDDDDD;
-  border-radius: 40px;
+  border: none;
+  border-radius: 0;
   box-sizing: border-box;
   min-height: calc(100vh - 106px);
   display: flex;
@@ -18,13 +18,13 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .header h1 {
   margin: 0;
   color: #333333;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
 }
 
@@ -32,28 +32,28 @@
 .communityDetailImages {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* ===== Active Toggle ===== */
 .activeToggle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   user-select: none;
 }
 
 .activeToggleLabel {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #333;
 }
 
 .toggleSwitch {
   position: relative;
-  width: 44px;
-  height: 24px;
-  border-radius: 12px;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
   transition: background 0.3s ease;
 }
 
@@ -68,16 +68,16 @@
 .toggleKnob {
   position: absolute;
   top: 2px;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: #fff;
   transition: left 0.3s ease;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
 
 .toggleOn .toggleKnob {
-  left: 22px;
+  left: 20px;
 }
 
 .toggleOff .toggleKnob {
@@ -86,20 +86,20 @@
 
 /* ===== Error State ===== */
 .errorBox {
-  padding: 16px;
+  padding: 12px;
   background: #FFFFFF;
   border: 1px solid #D32F2F;
-  border-radius: 10px;
+  border-radius: 8px;
   color: #D32F2F;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 /* ===== Detail Card ===== */
 .communityDetailCard {
   border: 1px solid #eee;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
   background: #fff;
 }
@@ -121,13 +121,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 11px;
   color: #888;
   background: #f3f3f3;
 }
 
 .communityDetailMeta {
-  padding: 12px;
+  padding: 10px;
 }
 
 .metaTop {
@@ -139,22 +139,22 @@
 .metaLeft {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .metaRight {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .communityCardNickname {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .communityCardDate {
-  font-size: 12px;
+  font-size: 11px;
   color: #777;
   white-space: nowrap;
 }
@@ -162,8 +162,8 @@
 .likeRow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 /* ===== Like Button (Instagram-style) ===== */
@@ -177,9 +177,13 @@
 }
 
 .heartIcon {
-  font-size: 24px;
+  font-size: 20px;
   color: #8e8e8e;
   transition: transform 0.2s ease;
+  display: inline-block;
+  width: 20px;
+  text-align: center;
+  line-height: 1;
 }
 
 .heartIcon:hover {
@@ -202,17 +206,17 @@
 }
 
 .likeCount {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #262626;
 }
 
 /* ===== Comment Section ===== */
 .commentBox {
-  margin-top: 16px;
+  margin-top: 12px;
   border: 1px solid #eee;
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: 8px;
+  padding: 10px;
   background: #fff;
 }
 
@@ -220,28 +224,29 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .commentHeader h3 {
   margin: 0;
+  font-size: 14px;
 }
 
 .commentPager {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
 
 .commentPager button {
   margin: 0;
-  padding: 4px 12px;
+  padding: 4px 10px;
   border: 1px solid #ddd;
   background: #fff;
   color: #333;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .commentPager button:disabled {
@@ -250,28 +255,29 @@
 }
 
 .commentPager span {
-  font-size: 12px;
+  font-size: 11px;
   color: #666;
 }
 
 .notice {
   border: 1px solid #eee;
   background: #f3f3f3;
-  border-radius: 10px;
-  padding: 20px;
+  border-radius: 8px;
+  padding: 12px;
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
+  font-size: 12px;
 }
 
 .commentList {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .commentItem {
   border: 1px solid #f0f0f0;
-  border-radius: 10px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 8px;
   background: #fafafa;
 }
 
@@ -279,24 +285,24 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 6px;
-  gap: 10px;
+  margin-bottom: 5px;
+  gap: 8px;
 }
 
 .commentNick {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .commentDate {
-  font-size: 12px;
+  font-size: 11px;
   color: #777;
   white-space: nowrap;
 }
 
 .commentEditBtn {
-  font-size: 12px;
-  padding: 2px 8px;
+  font-size: 11px;
+  padding: 2px 6px;
   border: 1px solid #ddd;
   background: #fff;
   color: #333;
@@ -306,62 +312,64 @@
 }
 
 .commentText {
-  font-size: 13px;
+  font-size: 12px;
   white-space: pre-wrap;
 }
 
 .commentEditArea {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .commentEditArea textarea {
   width: 100%;
   border: 1px solid #ddd;
-  border-radius: 10px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 8px;
   resize: vertical;
+  font-size: 12px;
 }
 
 .commentEditActions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .commentEditActions button {
   margin: 0;
-  padding: 4px 12px;
+  padding: 4px 10px;
   border: 1px solid #ddd;
   background: #fff;
   color: #333;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .commentForm {
-  margin-top: 12px;
+  margin-top: 10px;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .commentForm textarea {
   width: 100%;
   border: 1px solid #ddd;
-  border-radius: 10px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 8px;
   resize: vertical;
+  font-size: 12px;
 }
 
 .commentFormSubmit {
-  padding: 8px 16px;
+  padding: 8px 14px;
   border: none;
   background: #2E7D32;
   color: #fff;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   margin: 0;
 }
 
@@ -372,25 +380,6 @@
 }
 
 .commentHint {
-  font-size: 12px;
+  font-size: 11px;
   color: #777;
-}
-
-/* ===== Responsive Design ===== */
-@media (max-width: 768px) {
-  .container {
-    padding: 20px;
-    width: 100%;
-  }
-
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-
-  .header h1 {
-    font-size: 20px;
-  }
-
 }

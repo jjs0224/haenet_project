@@ -1,0 +1,28 @@
+.wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.icon {
+  width: 28px;
+  height: 28px;
+  transition: all 0.2s ease;
+}
+
+.active {
+  opacity: 1;
+  filter: none;
+}
+
+.inactive {
+  opacity: 0.25;
+  filter: grayscale(100%);
+}
+
+.text {
+  margin-left: 6px;
+  font-size: 14px;
+  color: #666;
+}

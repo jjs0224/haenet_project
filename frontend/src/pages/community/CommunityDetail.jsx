@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { CommunityContext } from "../../context/CommunityContext";
 import { MemberContext } from "../../context/MemberContext";
 import { CommunityAPI } from "../../api/communityApi";
@@ -14,7 +14,6 @@ function formatDate(v) {
 
 export default function CommunityDetail() {
   const { id } = useParams();
-  const nav = useNavigate();
   const { stateCommunity, communityActions } = useContext(CommunityContext);
 
   const { stateMember } = useContext(MemberContext);
@@ -156,7 +155,6 @@ export default function CommunityDetail() {
   const onRecommend = async () => {
     try {
       const out = await communityActions.recommendToggle(id);
-      console.log("recommendToggle response(detail):", out);
       const nowLiked = out?.data?.recommended ?? !liked;
       setLiked(nowLiked);
       if (nowLiked) {

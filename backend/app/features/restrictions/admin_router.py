@@ -28,3 +28,8 @@ def update_category(category_id: int, payload: schemas.CategoryUpdate, db: Sessi
 @router.put("/restrictions/item/{item_id}", response_model=dict, dependencies=[Depends(require_admin)], )
 def update_item(item_id: int, payload: schemas.ItemUpdate, db: Session = Depends(get_db)):
     return service.update_item(db, item_id, payload)
+
+# 기존 Category에 Item 추가
+@router.post("/restrictions/category/{category_id}/item", response_model=dict, dependencies=[Depends(require_admin)])
+def add_item_to_category(category_id: int, payload: schemas.ItemAddToCategory, db: Session = Depends(get_db)):
+    return service.add_item_to_category(db, category_id, payload)

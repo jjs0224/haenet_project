@@ -1,22 +1,16 @@
 /* ===== Description Text ===== */
 .desc {
-  margin: 0 0 12px 0;
-  color: #666666; /* 미디엄 그레이 */
-  font-size: 14px;
+  margin: 0 0 10px 0;
+  color: #666666;
+  font-size: 12px;
 }
 
 /* ===== Template 행 ===== */
 .templateRow {
   display: flex;
-  flex-direction: row;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-@media (max-width: 600px) {
-  .templateRow {
-    flex-direction: column;
-  }
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 /* 템플릿 카드 하나 */
@@ -25,10 +19,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   border: 2px solid #DDDDDD;
-  border-radius: 10px;
-  padding: 12px 8px;
+  border-radius: 8px;
+  padding: 10px 6px;
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease;
   text-align: center;
@@ -39,15 +33,15 @@
 }
 
 .templateItem img {
-  width: 80px;
-  height: 80px;
+  width: 64px;
+  height: 64px;
   object-fit: cover;
   border-radius: 6px;
   background: #F5F5F5;
 }
 
 .templateItem b {
-  font-size: 14px;
+  font-size: 13px;
   color: #333333;
 }
 
@@ -59,42 +53,43 @@
 
 /* 템플릿 카드 내 설명 텍스트 */
 .small {
-  font-size: 12px;
+  font-size: 11px;
   color: #666666;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 /* ===== Checkbox Row ===== */
 .checkboxRow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
 }
 
 /* ===== Section Container ===== */
 .section {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .sectionTitle {
   font-weight: 700;
-  margin-bottom: 8px;
-  color: #333333; /* 다크 그레이 */
+  margin-bottom: 6px;
+  color: #333333;
+  font-size: 13px;
 }
 
 /* ===== Loading & Empty States ===== */
 .loading {
-  font-size: 14px;
-  color: #666666; /* 미디엄 그레이 */
-  padding: 20px;
+  font-size: 12px;
+  color: #666666;
+  padding: 16px;
   text-align: center;
 }
 
 .empty {
-  font-size: 14px;
-  color: #999999; /* 라이트 그레이 */
-  padding: 20px;
+  font-size: 12px;
+  color: #999999;
+  padding: 16px;
   text-align: center;
 }
 
@@ -102,83 +97,85 @@
 .reviewList {
   list-style: none;
   margin: 0;
-  padding-left: 18px;
+  padding-left: 12px;
 }
 
 .reviewItem {
   display: flex;
   list-style: none;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-  font-size: 14px;
-  color: #333333; /* 다크 그레이 */
+  gap: 6px;
+  margin-bottom: 5px;
+  font-size: 12px;
+  color: #333333;
 }
 
 .reviewTitle {
   font-weight: 600;
-  color: #333333; /* 다크 그레이 */
+  color: #333333;
 }
 
 /* ===== Badges ===== */
 .badge {
-  font-size: 12px;
-  padding: 2px 8px;
+  font-size: 10px;
+  padding: 2px 6px;
   border-radius: 999px;
   line-height: 1;
   font-weight: 500;
 }
 
 .badgeActive {
-  background: #E8F5E9; /* 연한 그린 배경 */
-  color: #2E7D32; /* 딥 그린 텍스트 */
+  background: #E8F5E9;
+  color: #2E7D32;
 }
 
 .badgeInactive {
-  background: #F5F5F5; /* 아주 연한 웜그레이 */
-  color: #666666; /* 미디엄 그레이 */
+  background: #F5F5F5;
+  color: #666666;
 }
 
 /* ===== Actions ===== */
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 6px;
+  margin-top: 10px;
 }
 
 /* ===== Buttons ===== */
 .btnGhost {
   background: transparent;
   border: 1px solid #DDDDDD;
-  padding: 8px 12px;
+  padding: 7px 10px;
   border-radius: 8px;
   cursor: pointer;
-  color: #333333; /* 다크 그레이 */
+  color: #333333;
   font-weight: 500;
   transition: all 0.3s ease;
+  font-size: 12px;
 }
 
 .btnGhost:hover {
-  background: #F5F5F5; /* 아주 연한 웜그레이 */
+  background: #F5F5F5;
   border-color: #BBBBBB;
 }
 
 .btnPrimary {
-  background: #2E7D32; /* 딥 그린 */
+  background: #2E7D32;
   color: white;
   border: none;
-  padding: 8px 12px;
+  padding: 7px 10px;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
   transition: all 0.3s ease;
+  font-size: 12px;
 }
 
 .btnPrimary:hover {
-  background: #1B5E20; /* 더 진한 그린 */
+  background: #1B5E20;
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(46, 125, 50, 0.3);
+  box-shadow: 0 2px 6px rgba(46, 125, 50, 0.3);
 }
 
 .btnPrimary:disabled {
@@ -191,9 +188,9 @@
 
 /* ===== Hint & Error Messages ===== */
 .hint {
-  margin-top: 10px;
-  font-size: 12px;
-  color: #D32F2F; /* 레드 - 주의 */
+  margin-top: 8px;
+  font-size: 11px;
+  color: #D32F2F;
 }
 
 /* ===== Inactive State ===== */
@@ -206,9 +203,9 @@
 }
 
 .inactiveTag {
-  margin-left: 6px;
-  font-size: 12px;
-  color: #999999; /* 라이트 그레이 */
+  margin-left: 5px;
+  font-size: 11px;
+  color: #999999;
 }
 
 /* ===== Ghost 버튼 disabled ===== */
@@ -227,15 +224,15 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  border-radius: 10px;
+  gap: 12px;
+  border-radius: 8px;
   pointer-events: all;
 }
 
 .loadingSpinner {
-  width: 44px;
-  height: 44px;
-  border: 4px solid #DDDDDD;
+  width: 36px;
+  height: 36px;
+  border: 3px solid #DDDDDD;
   border-top-color: #2E7D32;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -246,7 +243,7 @@
 }
 
 .loadingText {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   color: #333333;
   margin: 0;

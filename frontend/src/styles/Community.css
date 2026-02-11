@@ -6,28 +6,28 @@ body{
 
 .container{
     margin: 0 auto;
-    padding: 30px;
-    width: 80%;
-    max-width: 850px;
-    border: 1px solid #ddd;
-    border-radius: 40px;
+    padding: 16px;
+    width: 100%;
+    max-width: 430px;
+    border: none;
+    border-radius: 0;
 }
 
 .ctn_box{
-    margin-bottom: 30px;
-    padding: 20px;
+    margin-bottom: 16px;
+    padding: 12px;
     border: 1px solid #ddd;
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
 .ai_img {
     background-color: #eee;
     width: 100%;
-    height: 500px;
-    border-radius: 10px;
+    height: 240px;
+    border-radius: 8px;
     text-align: center;
-    line-height: 500px;
-    font-size: 14px;
+    line-height: 240px;
+    font-size: 12px;
 }
 
 .row {
@@ -61,43 +61,44 @@ body{
 .icon .profile {
     display: inline-block;
     background: #333;
-    width: 80px;
-    height: 80px;
-    border-radius: 40px;
+    width: 36px;
+    height: 36px;
+    border-radius: 18px;
     color: white;
     text-align: center;
-    line-height: 80px;
+    line-height: 36px;
+    font-size: 13px;
 }
 
 .comment .icon .profile{
-    width: 40px;
-    height: 40px;
-    line-height: 40px;
-    font-size: 12px;
+    width: 32px;
+    height: 32px;
+    line-height: 32px;
+    font-size: 11px;
 }
 
 .icon .nickname {
     display: inline-block;
-    font-size: 20px;
-    margin-left: 10px;
+    font-size: 14px;
+    margin-left: 8px;
 }
 
 .comment .icon .nickname {
-    font-size: 12px;
+    font-size: 11px;
     text-align: right;
 }
 
 .comment .left {
-    font-size: 14px;
+    font-size: 12px;
 }
 .like {
-    margin-right: 10px;
+    margin-right: 8px;
     text-align: right;
-    font-size: 15px;
+    font-size: 13px;
 }
 
 .like .text{
-    margin: 0 10px;
+    margin: 0 6px;
 }
 
 .create_img{
@@ -107,20 +108,20 @@ body{
 .notice{
     border: 1px solid #eee;
     background: #f3f3f3;
-    border-radius: 10px;
-    padding: 20px;
+    border-radius: 8px;
+    padding: 12px;
     text-align: center;
-    margin-bottom:20px;
+    margin-bottom:12px;
 }
 
 .text p{
     margin: 0;
     padding: 0;
-    font-size: 16px;
+    font-size: 13px;
 }
 
 .text span{
-    font-size: 14px;
+    font-size: 12px;
 }
 
 /* ---------------------------
@@ -130,28 +131,28 @@ body{
 .communityCardList {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 8px;
 }
 
 .communityCard {
     display: flex;
-    gap: 12px;
-    padding: 12px;
+    gap: 10px;
+    padding: 10px;
     border: 1px solid #eee;
-    border-radius: 12px;
+    border-radius: 8px;
     background: #fff;
     text-decoration: none;
     color: inherit;
 }
 
 .communityCard:hover {
-    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
 }
 
 .communityCardThumb {
-    width: 120px;
-    height: 90px;
-    border-radius: 10px;
+    width: 90px;
+    height: 68px;
+    border-radius: 8px;
     overflow: hidden;
     background: #f3f3f3;
     flex: 0 0 auto;
@@ -169,7 +170,7 @@ body{
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: 10px;
     color: #888;
 }
 
@@ -182,35 +183,35 @@ body{
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    gap: 10px;
+    gap: 6px;
 }
 
 .communityCardNickname {
     font-weight: 700;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .communityCardDate {
-    font-size: 12px;
+    font-size: 11px;
     color: #777;
     white-space: nowrap;
 }
 
 .communityCardComment {
-    margin-top: 8px;
+    margin-top: 6px;
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
 }
 
 .communityCardCommentLabel {
-    font-size: 12px;
+    font-size: 11px;
     color: #666;
     flex: 0 0 auto;
 }
 
 .communityCardCommentText {
-    font-size: 13px;
+    font-size: 12px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

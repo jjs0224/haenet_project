@@ -6,9 +6,10 @@ ChromaDB 인덱스 빌드 스크립트.
 - retrieval.py는 아래 메타데이터 키를 사용합니다.
   - menu (str)
   - variants (csv str 또는 list)
-  - ingredients_ko (csv str 또는 list)
+  - ingredients (csv str 또는 list)
   - alg_tags (csv str 또는 list)
   - source (str)
+- ✅ (NEW) menu_description_ko (str) : 메뉴 한국어 간단 설명(옵션)
 - 임베딩 모델/컬렉션/퍼시스트 디렉터리는 build와 retrieval이 동일해야 합니다.
 
 기본 경로 정책
@@ -51,7 +52,7 @@ DEFAULT_DATASET_PATH = (
     / "data"
     / "datasets"
     / "raw"
-    / "menu_seed_with_alg_tags_variants_v3.json"
+    / "menu_seed.json"
 )
 DEFAULT_CHROMA_DIR = BASE_DIR / "data" / "chroma"
 
@@ -63,6 +64,14 @@ def _safe_str_list(x: Any) -> List[str]:
         return [str(v).strip() for v in x if str(v).strip()]
     s = str(x).strip()
     return [s] if s else []
+
+
+def _safe_str(x: Any) -> str:
+    if x is None:
+        return ""
+    if isinstance(x, str):
+        return x.strip()
+    return str(x).strip()
 
 
 def _chunked(n: int, size: int):
@@ -170,10 +179,13 @@ def main() -> None:
         if not menu:
             continue
 
-        ingredients = _safe_str_list(item.get("ingredients_ko"))
+        ingredients = _safe_str_list(item.get("ingredients"))
         # 호환: alg_tags 또는 ALG_TAG
         alg_tags = _safe_str_list(item.get("alg_tags") or item.get("ALG_TAG"))
         variants = _safe_str_list(item.get("variants"))
+
+        # ✅ NEW: 메뉴 간단 설명(있으면 저장)
+        menu_description_ko = _safe_str(item.get("menu_description_ko"))
 
         rid = str(item.get("id") or f"menu_{idx}")
         doc = " ".join([menu] + variants).strip()
@@ -186,9 +198,11 @@ def main() -> None:
                 # retrieval._split_csv는 csv string 또는 list 모두 처리 가능.
                 # 여기서는 csv string으로 저장하여 Chroma metadata 크기를 줄인다.
                 "variants": ", ".join(variants),
-                "ingredients_ko": ", ".join(ingredients),
+                "ingredients": ", ".join(ingredients),
                 "alg_tags": ", ".join(alg_tags),
                 "source": source,
+                # ✅ NEW
+                "menu_description_ko": menu_description_ko,
             }
         )
 
@@ -222,6 +236,8 @@ def main() -> None:
     metas = sample.get("metadatas") or []
     print("[SAMPLE] ids:", sample.get("ids"))
     print("[SAMPLE] menus:", [m.get("menu") for m in metas])
+    # ✅ NEW: 샘플에 description도 찍어 확인
+    print("[SAMPLE] menu_description_ko:", [m.get("menu_description_ko") for m in metas])
 
     print("[SUCCESS] Chroma index build complete.")
 

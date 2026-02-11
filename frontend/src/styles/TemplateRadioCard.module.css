@@ -3,37 +3,30 @@
 /* grid wrapper */
 .templateGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 10px;
-}
-
-@media (max-width: 600px) {
-  .templateGrid {
-    grid-template-columns: 1fr;
-  }
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 /* card */
 .card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-
+  gap: 6px;
   border: 1px solid #ddd;
-  border-radius: 12px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 8px;
   background: #fff;
   cursor: pointer;
 }
 
 .card input[type="radio"] {
-  display: none; /* ✅ 이제 진짜 적용됨 */
+  display: none;
 }
 
 .card img {
   width: 100%;
-  height: 250px;
+  height: 180px;
   object-fit: cover;
   border-radius: 8px;
   border: 1px solid #eee;
@@ -52,10 +45,10 @@
 
 .title {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .desc {
-  font-size: 12px;
+  font-size: 11px;
   color: #666;
 }

@@ -32,7 +32,6 @@ export default function CommunityList() {
 
     try {
       const out = await communityActions.recommendToggle(id);
-      console.log("recommendToggle response:", out);
 
       // 토글 후 리스트 재조회 -> 화면 반영 100%
       await communityActions.fetchList();

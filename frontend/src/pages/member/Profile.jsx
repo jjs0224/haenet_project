@@ -3,7 +3,6 @@ import { MemberContext } from "../../context/MemberContext";
 import { ReviewContext } from "../../context/ReviewContext";
 import { CommunityContext } from "../../context/CommunityContext";
 import ProfileSidebar from "../../components/profile/ProfileSidebar";
-import RestrictionsSection from "../../components/profile/RestrictionsSection";
 import FoodMapSection from "../../components/profile/FoodMapSection";
 import ReviewSection from "../../components/profile/ReviewSection";
 import CommunitySection from "../../components/profile/CommunitySection";
@@ -29,9 +28,6 @@ export default function Profile() {
   // ✅ 새로고침/직접 진입 등으로 me가 비어있을 때만 1회 보조 로드
   // (MemberProvider가 토큰 변화 시 자동으로 loadMe를 호출하므로, 여기서 매번 호출하면 중복될 수 있음)
   const requestedMeRef = useRef(false);
-
-  // 내가 선택한 item_ids
-  const selectedIds = useMemo(() => (me?.item_ids ? me.item_ids : []), [me]);
 
   // ✅ me가 없고 로딩 중도 아니면 1회만 loadMe 시도
   useEffect(() => {
@@ -74,8 +70,6 @@ export default function Profile() {
 
         <div>
           {stateMember?.error && <div className={styles.error}>{stateMember.error}</div>}
-
-          <RestrictionsSection selectedIds={selectedIds} />
 
           <FoodMapSection communities={myCommunities} />
 

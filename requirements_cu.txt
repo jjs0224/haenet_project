@@ -167,8 +167,7 @@ async-timeout==5.0.1
 attrs==25.4.0
 backoff==2.2.1
 bce-python-sdk==0.9.59
-boto3==1.34.0
-bcrypt==4.0.1
+bcrypt>=3.2.2
 build==1.4.0
 certifi==2026.1.4
 cffi==2.0.0

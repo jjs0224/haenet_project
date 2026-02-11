@@ -43,3 +43,10 @@ class ItemUpdate(BaseModel):
     item_label_en: str
     item_active: bool
 # Category, Item 수정 --- end
+
+# Category에 Item 추가 --- start
+class ItemAddToCategory(BaseModel):
+    item_label_ko: str
+    item_label_en: str
+    item_active: bool = True
+# Category에 Item 추가 --- end

@@ -33,16 +33,8 @@ export function UploadProvider({ children }) {
         fd.append("file", file);
         fd.append("type", type); // menu / receipt
 
-        console.log("fd file :: ", file)
-        console.log("fd type:: ", type)
-
-        console.log("fd data :: ", fd.data)
-
-        console.log("upload fd file :: ", fd.file)
-        console.log("upload fd type :: ", fd.type)
-
         const r = await MenuAPI.upload(fd);
-        console.log("실제 넘어가는 값 :: ", r.data)
+        // console.log("실제 넘어가는 값 :: ", r.data)
 
         dispatch({ type: "DONE", payload: r.data });
         return r.data;

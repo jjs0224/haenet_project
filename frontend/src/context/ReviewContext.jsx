@@ -49,9 +49,9 @@ export function ReviewProvider({ children }) {
       dispatch({ type: "LOADING" });
       try {
         const r = await ReviewAPI.myList();
-        console.log("myList rrr :: ", r.data)
+        // console.log("myList rrr :: ", r.data)
         const list = Array.isArray(r.data) ? r.data : r.data?.items ?? [];
-        console.log("myList list :: ", list)
+        // console.log("myList list :: ", list)
         dispatch({ type: "SET_LIST", payload: list });
         return list;
       } catch (e) {

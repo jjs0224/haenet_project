@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
@@ -41,6 +41,7 @@ def get_categories_with_items(db: Session, only_active: bool = True) -> List[dic
     """
     카테고리 + 아이템 전체를 내려줄 payload 생성.
     - N+1 방지: items 전체 1번 조회 후 category_id로 묶기
+    - item_label_en: "ALG_" prefix 제거해서 내려줌 (DB 값 변경 없음)
     """
     cat_stmt = select(Category).order_by(Category.category_id.asc())
     item_stmt = select(Item).order_by(
@@ -54,6 +55,12 @@ def get_categories_with_items(db: Session, only_active: bool = True) -> List[dic
 
     categories = db.execute(cat_stmt).scalars().all()
     items = db.execute(item_stmt).scalars().all()
+
+    # item_label_en prefix 제거 유틸 (응답용)
+    def strip_alg_prefix(v: Optional[str]) -> Optional[str]:
+        if not v:
+            return v
+        return v[4:] if v.startswith("ALG_") else v
 
     bucket: Dict[int, list] = {}
     for it in items:
@@ -71,7 +78,8 @@ def get_categories_with_items(db: Session, only_active: bool = True) -> List[dic
                     {
                         "item_id": it.item_id,
                         "item_label_ko": it.item_label_ko,
-                        "item_label_en": it.item_label_en,
+                        # "ALG_" 제거해서 내려감
+                        "item_label_en": strip_alg_prefix(it.item_label_en),
                         "category_id": it.category_id,
                         "item_active": bool(it.item_active),
                     }

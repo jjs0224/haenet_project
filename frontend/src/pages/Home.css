@@ -3,14 +3,14 @@
    =================================================== */
 
 .home-container {
-  max-width: 420px;
+  max-width: 430px;
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
   background: #FAFAFA;
 
   /* app-main이 Header·BottomNav 갭을 전역으로 처리 → 여기서는 남은 영역만 채움 */
-  min-height: calc(100vh - 106px); /* Header(~16px pad) + BottomNav(90px pad) */
+  min-height: calc(100vh - 150px); /* Header(~16px pad) + BottomNav(90px pad) */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -25,18 +25,18 @@
    =================================================== */
 
 .home-logo-wrap {
-  width: calc(100% - 32px);   /* 좌우 여백 16px씩 */
-  min-height: 200px;
-  max-height: 540px;
+  width: calc(100% - 24px);   /* 좌우 여백 12px씩 */
+  flex: none;
+  height: clamp(220px, 55vh, 420px);
 
   /* 남은 빈 공간을 로고가 모두 채움 → 버튼이 바로 아래로 붙음 */
   flex: 1 1 0%;
 
-  border-radius: 24px;
+  border-radius: 16px;
   overflow: hidden;
-  border: 2px solid #E0E0E0;
+  border: 1.5px solid #E0E0E0;
   background: #FFFFFF;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+  box-shadow: 0 3px 16px rgba(0,0,0,0.07);
 
   display: flex;
   align-items: center;
@@ -47,11 +47,11 @@
 /* ===== 이미지 삭제 X 버튼 ===== */
 .home-remove-btn {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 8px;
+  right: 8px;
   z-index: 2;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -59,7 +59,7 @@
   color: #FFFFFF;
   border: none;
   border-radius: 50%;
-  font-size: 20px;
+  font-size: 16px;
   line-height: 1;
   cursor: pointer;
   transition: background 0.18s ease, transform 0.12s ease;
@@ -87,12 +87,12 @@
    =================================================== */
 
 .home-bottom-area {
-  width: calc(100% - 32px);
+  width: calc(100% - 24px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
-  padding-top: 16px;
+  gap: 12px;
+  padding-top: 14px;
   flex-shrink: 0;
 }
 
@@ -109,8 +109,8 @@
 
   background: #FFFFFF;
   border: 1.5px solid #E0E0E0;
-  border-radius: 16px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   overflow: hidden;
 }
 
@@ -119,9 +119,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 
-  padding: 14px 8px;
+  padding: 12px 6px;
   border: none;
   background: transparent;
   color: #2E7D32;
@@ -138,7 +138,7 @@
 }
 
 .home-pick-btn span {
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.2px;
 }
@@ -146,7 +146,7 @@
 /* 두 버튼 사이 구분선 */
 .home-pick-divider {
   width: 1px;
-  height: 42px;
+  height: 38px;
   background: #E0E0E0;
   flex-shrink: 0;
 }
@@ -161,29 +161,29 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
 
-  padding: 16px 20px;
+  padding: 14px 16px;
   border: none;
-  border-radius: 16px;
+  border-radius: 12px;
   background: #2E7D32;
   color: #FFFFFF;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 700;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(46,125,50,0.35);
+  box-shadow: 0 3px 12px rgba(46,125,50,0.35);
   transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
 }
 
 .home-analyze-btn:hover {
   background: #1B5E20;
-  box-shadow: 0 6px 18px rgba(46,125,50,0.45);
+  box-shadow: 0 5px 16px rgba(46,125,50,0.45);
 }
 
 .home-analyze-btn:active {
   transform: translateY(1px);
-  box-shadow: 0 2px 8px rgba(46,125,50,0.3);
+  box-shadow: 0 2px 6px rgba(46,125,50,0.3);
 }
 
 /* ── disabled ── */
@@ -196,35 +196,4 @@
 
 .home-analyze-btn:disabled svg {
   opacity: 0.55;
-}
-
-
-/* ===================================================
-   Mobile (≤ 480 px)
-   =================================================== */
-
-@media (max-width: 480px) {
-  .home-logo-wrap {
-    width: calc(100% - 24px);
-    min-height: 180px;
-  }
-
-  .home-bottom-area {
-    width: calc(100% - 24px);
-    gap: 12px;
-    padding-top: 14px;
-  }
-
-  .home-pick-btn {
-    padding: 12px 6px;
-  }
-
-  .home-pick-btn span {
-    font-size: 0.76rem;
-  }
-
-  .home-analyze-btn {
-    padding: 15px 16px;
-    font-size: 1rem;
-  }
 }

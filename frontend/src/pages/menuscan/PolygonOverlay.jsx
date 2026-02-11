@@ -1,20 +1,21 @@
 import React, { useMemo } from "react";
-import "./PolygonOverlay.css";
+// import "./PolygonOverlay.css";
+import './menuscan.css';
 
 /**
- * [확정된 최신 구조]
- * - poly: item.match.poly
- * - label: item.menu.menu_name_en (fallback: ko)
+ * [final_translated 기준 + 하위호환]
+ * - poly: item.poly  (fallback: item.match.poly)
+ * - label: item.menu_name_en (fallback: item.menu.menu_name_en -> ko)
+ * - color: risk_difficulty (3=gray, 2=red, 1=orange, 0=green)
  *
  * 목표:
- * - poly 박스 표시
- * - 박스 크기에 맞춰 글씨(영문 메뉴명) 자동 크기 조절
- * - 길면 2줄까지 자동 래핑(tspan)
- * - 클릭 시 onSelectItem(item)
+ * - poly 박스 표시 (risk_difficulty 기반 색상)
+ * - 박스 안에 "한 줄"로, 박스 높이에 맞게 텍스트 자동 맞춤
+ * - 클릭 시 onSelectItem(item)로 Modal 연동
  */
 
 function extractPoly(item) {
-  const poly = item?.match?.poly;
+  const poly = item?.poly ?? item?.match?.poly;
 
   if (!Array.isArray(poly)) return null;
   if (!poly.every((p) => Array.isArray(p) && p.length >= 2)) return null;
@@ -24,8 +25,45 @@ function extractPoly(item) {
     .filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
 }
 
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
+}
+
+// stroke(hex) -> rgba
+function hexToRgba(hex, alpha) {
+  const h = String(hex || "").replace("#", "").trim();
+  if (h.length !== 6) return `rgba(0,0,0,${alpha})`;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function getLabel(item) {
-  return item?.menu?.menu_name_en || item?.menu?.menu_name_ko || "";
+  return (
+    item?.menu_name_en ||
+    item?.menu?.menu_name_en ||
+    item?.menu_name_ko ||
+    item?.menu?.menu_name_ko ||
+    ""
+  );
+}
+
+function riskDifficultyToKey(v) {
+  const n = Number(v);
+  if (n === 3) return "gray";
+  if (n === 2) return "red";
+  if (n === 1) return "orange";
+  if (n === 0) return "green";
+  return "gray";
+}
+
+function riskDifficultyToStroke(v) {
+  const key = riskDifficultyToKey(v);
+  if (key === "green") return "#16a34a";
+  if (key === "orange") return "#f97316";
+  if (key === "red") return "#ef4444";
+  return "#9ca3af";
 }
 
 function centroid(poly) {
@@ -65,39 +103,56 @@ function estimateTextWidthPx(text, fontSize) {
   return units * base * fontSize;
 }
 
-function wrapToTwoLines(text) {
+function truncateToFit(text, availW, fontSize) {
   const s = String(text || "").trim();
-  if (!s) return [];
+  if (!s) return "";
 
-  const parts = s.split(/\s+/);
-  if (parts.length <= 1) return [s];
+  if (estimateTextWidthPx(s, fontSize) <= availW) return s;
 
-  const mid = Math.ceil(parts.length / 2);
-  const l1 = parts.slice(0, mid).join(" ");
-  const l2 = parts.slice(mid).join(" ");
-  return l2 ? [l1, l2] : [l1];
+  const ell = "…";
+  if (estimateTextWidthPx(ell, fontSize) > availW) return "";
+
+  // binary search for max length that fits with ellipsis
+  let lo = 0;
+  let hi = s.length;
+  let best = "";
+
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const cand = s.slice(0, mid).trimEnd() + ell;
+    if (estimateTextWidthPx(cand, fontSize) <= availW) {
+      best = cand;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return best || ell;
 }
 
-function pickFontSizeForBox(lines, boxW, boxH, maxFont = 22, minFont = 10) {
-  if (!lines || lines.length === 0) return minFont;
+function pickSingleLineTextAndFont(label, boxW, boxH) {
+  const text = String(label || "").trim();
+  if (!text) return { text: "", fs: 10 };
 
+  // padding: 박스 내부 여백
   const padX = Math.max(6, boxW * 0.06);
-  const padY = Math.max(4, boxH * 0.10);
+  const padY = Math.max(4, boxH * 0.18);
+
   const availW = Math.max(0, boxW - padX * 2);
   const availH = Math.max(0, boxH - padY * 2);
 
-  const lineCount = lines.length;
+  // "박스 높이에 딱 맞게" => height 기반으로 상한을 먼저 잡음
+  const maxByH = availH / 1.05; // line-height 여유 거의 없이
+  const maxFont = clamp(Math.floor(maxByH), 10, 28);
+  const minFont = 9;
 
   for (let fs = maxFont; fs >= minFont; fs -= 1) {
-    const lineH = fs * 1.1;
-    const totalH = lineH * lineCount;
-    if (totalH > availH) continue;
-
-    const widest = Math.max(...lines.map((t) => estimateTextWidthPx(t, fs)));
-    if (widest <= availW) return fs;
+    const fitted = truncateToFit(text, availW, fs);
+    if (fitted) return { text: fitted, fs };
   }
 
-  return minFont;
+  // 최후: 최소 폰트 + truncate
+  return { text: truncateToFit(text, availW, minFont), fs: minFont };
 }
 
 export default function PolygonOverlay({ items, imgSize, onSelectItem }) {
@@ -119,35 +174,43 @@ export default function PolygonOverlay({ items, imgSize, onSelectItem }) {
         const bbox = getBBox(poly);
         const label = getLabel(item);
 
-        let lines = wrapToTwoLines(label);
-        if (bbox.h < 32 && label) lines = [label];
+        const riskDifficulty = item?.risk_difficulty ?? item?.risk?.risk_difficulty ?? null;
+        const colorKey = riskDifficultyToKey(riskDifficulty);
+        const stroke = riskDifficultyToStroke(riskDifficulty);
 
-        const fs = pickFontSizeForBox(lines, bbox.w, bbox.h, 22, 10);
-
+        const { text: fittedText, fs } = pickSingleLineTextAndFont(label, bbox.w, bbox.h);
         const [cx, cy] = centroid(poly);
 
-        const lineH = fs * 1.1;
-        const startY = lines.length <= 1 ? cy : cy - (lineH * (lines.length - 1)) / 2;
-
         return (
-          <g key={idx} className="ms-po__group" onClick={() => onSelectItem?.(item)}>
-            <polygon className="ms-po__poly" points={points} />
+          <g
+            key={item?.item_id || idx}
+            className="ms-po__group"
+            onClick={() => onSelectItem?.(item)}
+          >
+            <polygon
+              className={`ms-po__poly ms-po__poly--${colorKey}`}
+              points={points}
+              style={{
+                stroke,
+                fill: hexToRgba(stroke, 0.16), // 내부 연하게 고정
+                strokeWidth: 3,                // 테두리 진하게
+                strokeOpacity: 0.95,
+                fillOpacity: 1,
+                strokeLinejoin: "round",
+              }}
+            />
 
-            {lines.length > 0 && (
+            {fittedText && (
               <text
                 className="ms-po__text"
                 x={cx}
-                y={startY}
+                y={cy}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fontSize={fs}
                 strokeWidth={Math.max(2, fs * 0.12)}
               >
-                {lines.map((t, i) => (
-                  <tspan key={i} x={cx} y={startY + i * lineH}>
-                    {t}
-                  </tspan>
-                ))}
+                {fittedText}
               </text>
             )}
           </g>

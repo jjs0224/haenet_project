@@ -10,14 +10,15 @@
   pointer-events: auto;
   cursor: pointer;
 }
- 
+
 .ms-po__poly {
   fill: rgba(255, 0, 0, 0.2);
   stroke: red;
-  stroke-width: 2;
+  stroke-width: 1.5;
 }
- 
+
 .ms-po__text {
+  font-size: 12px;
   font-weight: 700;
   stroke: white;
   paint-order: stroke;

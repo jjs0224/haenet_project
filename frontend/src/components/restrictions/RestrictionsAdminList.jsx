@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 export default function RestrictionsAdminList({
   data = [],
@@ -7,7 +7,11 @@ export default function RestrictionsAdminList({
   onChangeItem,
   onSaveCategory,
   onSaveItem,
+  onAddItem,
 }) {
+  const [addingItemForCategory, setAddingItemForCategory] = useState(null);
+  const [newItemKo, setNewItemKo] = useState("");
+  const [newItemEn, setNewItemEn] = useState("");
   if (!data.length) {
     return (
       <div className="admin-list-panel">
@@ -86,6 +90,68 @@ export default function RestrictionsAdminList({
                 </button>
               </div>
             ))}
+
+            {/* 새로운 아이템 추가 폼 */}
+            {addingItemForCategory === c.category_id ? (
+              <div className="add-item-form">
+                <div className="add-item-inputs">
+                  <input
+                    type="text"
+                    value={newItemKo}
+                    onChange={(e) => setNewItemKo(e.target.value)}
+                    placeholder="item_label_ko"
+                    autoFocus
+                  />
+                  <input
+                    type="text"
+                    value={newItemEn}
+                    onChange={(e) => setNewItemEn(e.target.value)}
+                    placeholder="item_label_en"
+                  />
+                </div>
+                <div className="add-item-actions">
+                  <button
+                    onClick={async () => {
+                      if (!newItemKo.trim() || !newItemEn.trim()) {
+                        alert("한글명과 영문명을 모두 입력해주세요.");
+                        return;
+                      }
+                      await onAddItem(c.category_id, {
+                        item_label_ko: newItemKo.trim(),
+                        item_label_en: newItemEn.trim(),
+                      });
+                      setNewItemKo("");
+                      setNewItemEn("");
+                      setAddingItemForCategory(null);
+                    }}
+                    disabled={loading}
+                    className="save-button"
+                  >
+                    저장
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNewItemKo("");
+                      setNewItemEn("");
+                      setAddingItemForCategory(null);
+                    }}
+                    className="cancel-button"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="add-item-row">
+                <button
+                  onClick={() => setAddingItemForCategory(c.category_id)}
+                  disabled={loading}
+                  className="add-item-to-category-button"
+                >
+                  + Item 추가
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ))}

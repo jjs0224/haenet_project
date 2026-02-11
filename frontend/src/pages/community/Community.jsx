@@ -43,7 +43,6 @@ export default function Community() {
         review_ids: reviewIds,
       });
 
-      // template2(map) 생성 시 먹거리 지도 이미지를 localStorage에 저장
       if (templateId === 2 && result?.image_urls?.length > 0) {
         safeLocal.set("foodmap_image_url", result.image_urls[0]);
         if (result.community_id) {
@@ -65,6 +64,22 @@ export default function Community() {
   return (
     <div className={styles.container}>
       <h1 className={styles.title}>Community</h1>
+
+      {/* <ReviewProgressIcons count={activeCount} />
+
+        <button
+        type="button"
+        disabled={!canGenerate}
+        onClick={() => setIsOpen(true)}
+        >
+        AI Image
+        </button>
+
+        {!canGenerate && (
+        <p style={{ fontSize: 13, color: "#999", marginTop: 4 }}>
+            리뷰 3개를 작성하면 AI 이미지를 생성할 수 있어요
+        </p>
+        )} */}
 
       {/* 버튼 영역 */}
       <div className={styles.buttonRow}>

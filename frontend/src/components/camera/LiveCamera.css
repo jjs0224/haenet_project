@@ -1,0 +1,69 @@
+.camera-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.camera-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ========================
+   Guide Overlay
+======================== */
+
+.guide-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.guide-frame {
+  position: absolute;
+  inset: 4%;
+  border: 1px dashed mediumspringgreen;
+  border-radius: 12px;
+}
+
+.guide-message {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-size: 12px;
+}
+
+/* ========================
+   Capture Button
+======================== */
+
+.capture-button {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 30px;
+  border-radius: 12px;
+  border: 2px solid mediumspringgreen;
+  color: mediumspringgreen;
+  background: rgba(0, 0, 0, 0.5);
+  font-size: 14px;
+}
+
+/* ========================
+   Error fallback
+======================== */
+
+.camera-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+}
