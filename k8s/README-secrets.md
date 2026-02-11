@@ -37,7 +37,7 @@ Secret (ESO-managed):
 - DB_PASSWORD
 - JWT_SECRET_KEY
 - GEMINI_API_KEY
-- NAVER_API_KEY
+- NAVER_CLIENT_SECRET
 - NAVER_CLIENT_ID
 
 ConfigMap (non-secret):

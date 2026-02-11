@@ -85,7 +85,4 @@ S3_PREFIX_PERM = os.getenv("S3_PREFIX_PERM", "perm").strip("/")
 # gemini
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID", "")
-NAVER_API_KEY = os.getenv("NAVER_API_KEY", "")
-
-#  둘 다 지원: NAVER_CLIENT_SECRET 우선, 없으면 NAVER_API_KEY 사용
-NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET") or os.getenv("NAVER_API_KEY", "")
+NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "")
