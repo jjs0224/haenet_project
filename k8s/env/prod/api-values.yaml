@@ -1,6 +1,6 @@
 image:
     repository: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-api
-    tag: "sha-a1427301af41784d2c7414b2605fadbb683654fa"
+    tag: "sha-14893705e3f365b2fb75eb78ea5141563213f43c"
     pullPolicy: IfNotPresent
 
 env:
