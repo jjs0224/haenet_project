@@ -24,22 +24,37 @@ export const ReviewAPI = {
     throw new Error("review receipt job timeout");
   },
 
-  //  리뷰 생성(영수증 receipt_id 기반)
-  createFromReceipt: ({ receipt_id, title, content, rating, location, menu_name, images }) => {
+  // ---------------------------
+  // Create Review from Receipt
+  // POST /review/receipt/create
+  // form-data:
+  //  - receipt_id (job_id)
+  //  - title, content, rating
+  //  - menu_name (string)  (너 ReviewCreate에서 JSON.stringify(menuList)로 보내고 있음)
+  //  - images (0~3) optional
+  // ---------------------------
+  async createFromReceipt({ receipt_id, title, content, rating, menu_name, images = [] }) {
+    if (!receipt_id) throw new Error("receipt_id is required");
+    if (!title) throw new Error("title is required");
+    if (!content) throw new Error("content is required");
+
     const fd = new FormData();
     fd.append("receipt_id", receipt_id);
     fd.append("title", title);
     fd.append("content", content);
-    fd.append("rating", String(rating));
-  
-    if (location) fd.append("location", location);
-    if (menu_name) fd.append("menu_name", menu_name);
+    fd.append("rating", String(rating ?? 5));
 
-    (images || []).forEach((img) => fd.append("images", img));
+    // 너 프론트는 menu_name 필드로 보내고 있어서 그대로 유지
+    if (menu_name != null) {
+      fd.append("menu_name", String(menu_name));
+    }
 
-    return api.post("/review/create", fd, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const safeImgs = Array.isArray(images) ? images.slice(0, 3) : [];
+    for (const f of safeImgs) {
+      if (f) fd.append("images", f);
+    }
+
+    return axiosInstance.post("/review/receipt/create", fd);
   },
 
   //  전체 리뷰 리스트

@@ -56,8 +56,33 @@ async function refreshAccessTokenOnce() {
 
 // request :: accToken을 여기서 담아주는 곳
 api.interceptors.request.use((config) => {
+    //  [추가] Content-Type 안전 처리 (FormData 업로드 보호)
+    // - 영수증/이미지 업로드는 FormData라서 boundary 포함 Content-Type을 axios가 자동 설정해야 함
+    // - 혹시 어디선가 Content-Type이 잘못 박히는 상황을 방지하기 위해 FormData면 제거
+    // - JSON 요청은 Content-Type이 없을 때만 application/json 설정(선택)
+    const isFormData =
+        typeof FormData !== "undefined" && config.data instanceof FormData;
+
+    config.headers = config.headers || {};
+
+    if (isFormData) {
+        delete config.headers["Content-Type"];
+        delete config.headers["content-type"];
+    } else {
+        const method = (config.method || "get").toLowerCase();
+        const hasBody =
+            config.data !== undefined &&
+            config.data !== null &&
+            ["post", "put", "patch"].includes(method);
+
+        if (hasBody) {
+            if (!config.headers["Content-Type"] && !config.headers["content-type"]) {
+                config.headers["Content-Type"] = "application/json";
+            }
+        }
+    }
+
     if (accessToken) {
-        config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${accessToken}`;
     }
     return config;
