@@ -1,3 +1,4 @@
+import os
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -39,13 +40,12 @@ def run_receipt_ai_step5(*, image_path: str, receipt_id: str, base_dir: Path) ->
 
     cfg = PipelineConfig(
         mode="prod",
-        test_base_dir=base_dir,      #  결과물 생성 위치를 temp로 고정
+        test_base_dir=base_dir,
         run_name=receipt_id,
-        # step4에서 필요하면 키 넣기 (너가 사용한다 했으니 env에서 가져오거나 config에 넣어)
-        gemini_api_key=config.GEMINI_API_KEY if hasattr(config, "GEMINI_API_KEY") else None,
+        gemini_api_key=config.GEMINI_API_KEY,
         naver_cfg={
-            "NAVER_CLIENT_ID": getattr(config, "NAVER_CLIENT_ID", ""),
-            "NAVER_CLIENT_SECRET": getattr(config, "NAVER_CLIENT_SECRET", ""),
+            "NAVER_CLIENT_ID": config.NAVER_CLIENT_ID,
+            "NAVER_CLIENT_SECRET": config.NAVER_CLIENT_SECRET,
         },
     )
 
