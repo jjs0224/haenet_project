@@ -217,7 +217,7 @@ class Step6Options:
 
     temperature: float = 0.2
     top_p: float = 0.95
-    top_k: int = 40
+    top_k: int = 20
 
     max_retries: int = 2
     sleep_base: float = 0.7
