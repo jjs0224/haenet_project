@@ -45,39 +45,14 @@ spec:
           env:
             - name: PYTHONPATH
               value: "/app"
-            {{- $sm := .Values.secretMount | default dict -}}
-            {{- if $sm.enabled }}
-            - name: OPENAI_API_KEY_FILE
-              value: "{{ $sm.mountPath | default "/run/app-secrets" }}/{{ $sm.openaiApiKeyKey | default "OPENAI_API_KEY" }}"
-            - name: DB_PASSWORD_FILE
-              value: "{{ $sm.mountPath | default "/run/app-secrets" }}/{{ $sm.dbPasswordKey | default "DB_PASSWORD" }}"
-            - name: JWT_SECRET_KEY_FILE
-              value: "{{ $sm.mountPath | default "/run/app-secrets" }}/{{ $sm.jwtSecretKeyKey | default "JWT_SECRET_KEY" }}"
-            {{- end }}
           envFrom:
+            - secretRef:
+                name: {{ .Values.secretRefName | default "worker-secrets" }}
             - configMapRef:
                 name: {{ include "worker.fullname" . }}-config
 
-          {{- $secrets := .Values.secrets | default dict -}}
-          {{- $sm := .Values.secretMount | default dict -}}
-          {{- if and ($secrets.enabled | default false) ($sm.enabled | default false) }}
-          volumeMounts:
-            - name: app-secrets
-              mountPath: {{ $sm.mountPath | default "/run/app-secrets" | quote }}
-              readOnly: true
-          {{- end }}
-
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-
-      {{- $secrets := .Values.secrets | default dict -}}
-      {{- $sm := .Values.secretMount | default dict -}}
-      {{- if and ($secrets.enabled | default false) ($sm.enabled | default false) }}
-      volumes:
-        - name: app-secrets
-          secret:
-            secretName: {{ include "worker.fullname" . }}-secrets
-      {{- end }}
 
       {{- with .Values.nodeSelector }}
       nodeSelector:

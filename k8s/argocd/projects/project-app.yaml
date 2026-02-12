@@ -7,7 +7,7 @@ spec:
   description: "App-of-Apps project for app-dev/app-prod (redis/frontend/api/worker)"
 
   sourceRepos:
-    - https://github.com/mingoo684/cicdex2.git
+    - https://github.com/jjs0224/haenet_project
     - https://charts.bitnami.com/bitnami
 
   destinations:
@@ -18,10 +18,11 @@ spec:
     - server: https://kubernetes.default.svc
       namespace: app-prod
 
-  # AppProject 자체는 namespace 리소스를 폭넓게 허용(단순화)
+  # AppProject ?�체??namespace 리소?��? ??���??�용(?�순??
   clusterResourceWhitelist:
     - group: "*"
       kind: "*"
   namespaceResourceWhitelist:
     - group: "*"
       kind: "*"
+

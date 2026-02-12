@@ -21,11 +21,13 @@
 (!!! 현재는 개발 편의상 .env 파일을 그대로 사용하고 있습니다. !!!)
 
 - macOS / Linux
+
 ```bash
 cp env.example .env
 ```
 
 - Windows (CMD)
+
 ```bat
 copy env.example .env
 ```
@@ -70,22 +72,26 @@ MySQL 공식 이미지 동작 방식에 따라, **DB 볼륨이 비어 있는 “
 ## 4) 자주 쓰는 명령어
 
 ### 4.1 상태 확인
+
 ```bash
 docker compose ps
 ```
 
 ### 4.2 로그 확인
+
 ```bash
 docker compose logs -f mysql
 docker compose logs -f api
 ```
 
 ### 4.3 종료
+
 ```bash
 docker compose down
 ```
 
 ### 4.4 DB까지 완전 초기화(주의: 데이터 삭제)
+
 초기화 SQL을 다시 적용하고 싶을 때:
 
 ```bash
@@ -96,3 +102,5 @@ docker compose up --build
 ---
 
 ## 5) 로컬 개발 모드 (선택)
+
+test

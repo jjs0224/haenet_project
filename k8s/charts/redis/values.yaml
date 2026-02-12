@@ -1,5 +1,5 @@
 image:
-  repository: redis
+  repository: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/redis
   tag: "7-alpine"
   pullPolicy: IfNotPresent
 

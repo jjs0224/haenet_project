@@ -7,6 +7,19 @@ class ReceiptVerifyResponse(BaseModel):
     receipt_id: str
     extracted: Dict[str, Any]
 
+class ReviewEnqueueResponse(BaseModel):
+    job_id: str
+    status: str
+    queued_at: str
+
+class ReviewJobResponse(BaseModel):
+    job_id: str
+    status: str
+    extracted: Optional[Dict[str, Any]] = None
+    error: Optional[Any] = None
+    queued_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
 class ReviewCreateResponse(BaseModel):
     review_id: int
     image_urls: List[str] = Field(default_factory=list)

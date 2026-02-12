@@ -1,6 +1,7 @@
 /* ReviewDetailPage.module.css (iPhone 16 Pro Max Optimized) */
 
-.container {
+/* ========== Page Layout ========== */
+.pageContainer {
   padding: 16px;
   max-width: 430px;
   margin: 0 auto;
@@ -10,14 +11,15 @@
   flex-direction: column;
 }
 
-.header {
+/* ========== Page Header ========== */
+.pageHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
 }
 
-.title {
+.pageTitle {
   margin: 0;
   font-size: 20px;
   font-weight: 700;
@@ -39,6 +41,7 @@
   background: #5a6268;
 }
 
+/* ========== Error & Loading States ========== */
 .error {
   padding: 10px;
   background: #f8d7da;
@@ -54,4 +57,207 @@
   padding: 32px;
   font-size: 14px;
   color: #666666;
+}
+
+/* ========== Detail Container ========== */
+.detailContainer {
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+  background: white;
+}
+
+/* ========== Detail Header ========== */
+.detailHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.headerContent {
+  flex: 1;
+}
+
+.reviewTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #333333;
+  line-height: 1.3;
+}
+
+.meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #666666;
+}
+
+.location {
+  margin-left: 12px;
+}
+
+.editButton {
+  padding: 6px 12px;
+  background: #2E7D32;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.editButton:hover {
+  background: #1b5e20;
+}
+
+.usedInContentBadge {
+  padding: 6px 12px;
+  background: #dc3545;
+  color: white;
+  border: 1px solid #dc3545;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ========== Rating Section ========== */
+.ratingSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ratingLabel {
+  font-size: 14px;
+  color: #333333;
+  font-weight: 600;
+}
+
+.stars {
+  font-size: 18px;
+  color: #ffc107;
+}
+
+.ratingValue {
+  font-size: 12px;
+  color: #666666;
+}
+
+/* ========== Images Section ========== */
+.imagesSection {
+  display: flex;
+  flex-direction: column;
+}
+
+.imageGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.imageGrid.single {
+  grid-template-columns: 1fr;
+}
+
+.imageGrid.double {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.imageGrid.triple {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.imageWrapper {
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  overflow: hidden;
+  aspect-ratio: 1 / 1;
+  background: #f8f9fa;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ========== Items Section ========== */
+.itemsSection {
+  display: flex;
+  flex-direction: column;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  color: #333333;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.itemTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.itemTag {
+  padding: 5px 10px;
+  background: #f5e8e8;
+  color: #c00;
+  border: 1px solid #ffb4b4;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ========== Menu Section ========== */
+.menuSection {
+  display: flex;
+  flex-direction: column;
+}
+
+.menuTags {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.menuTag {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid #2E7D32;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #c7e9c8;
+  color: #1B5E20;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* ========== Content Section ========== */
+.contentSection {
+  display: flex;
+  flex-direction: column;
+}
+
+.contentBox {
+  margin-top: 2px;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  font-size: 14px;
+  color: #333333;
+  padding: 14px;
+  background: #c7e9c8;
+  border-radius: 10px;
+  border: 1px solid #e0e0e0;
 }

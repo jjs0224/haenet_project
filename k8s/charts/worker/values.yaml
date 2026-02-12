@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-    repository: ghcr.io/mingoo684/cicdex2-worker
+    repository: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-worker-gpu
     tag: dev-003
     pullPolicy: IfNotPresent
 
@@ -49,23 +49,27 @@ config:
     LOG_LEVEL: "INFO"
     # 예: S3 버킷/프리픽스 같은 비민감 값
     S3_BUCKET: ""
-    S3_PREFIX: "uploads/"
+    S3_PREFIX: "upload/"
+    S3_PREFIX_TMP: "tmp"
+    S3_PREFIX_PERM: "perm"
+    S3_REGION: ""
+    MENU_ASSISTANT_CHROMA_S3_PREFIX: ""
+    MENU_ASSISTANT_MENU_INDEX_S3_URI: ""
 
 # 비밀 값(Secret로 생성 + /run/app-secrets 로 마운트)
 secrets:
-    enabled: true
+    enabled: false
     # 아래는 "문자열"로 넣지 말고, 실제로는 env values에서 넣거나
     # (운영) External Secrets로 대체하는 것을 권장
-    OPENAI_API_KEY: ""
+    GEMINI_API_KEY: ""
     DB_PASSWORD: ""
     JWT_SECRET_KEY: ""
 
-secretMount:
-    enabled: true
-    mountPath: /run/app-secrets
-    openaiApiKeyKey: OPENAI_API_KEY
-    dbPasswordKey: DB_PASSWORD
-    jwtSecretKeyKey: JWT_SECRET_KEY
+# NOTE:
+# - worker fullname includes release name by default (see templates/_helpers.tpl)
+# - secretRefName controls the Secret used for envFrom (default: worker-secrets)
+
+secretRefName: worker-secrets
 
 resources: {}
 nodeSelector: {}

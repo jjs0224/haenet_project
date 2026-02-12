@@ -180,6 +180,10 @@
   font-size: 20px;
   color: #8e8e8e;
   transition: transform 0.2s ease;
+  display: inline-block;
+  width: 20px;
+  text-align: center;
+  line-height: 1;
 }
 
 .heartIcon:hover {

@@ -1,0 +1,28 @@
+{
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "foodray.net.",
+        "Type": "A",
+        "AliasTarget": {
+          "HostedZoneId": "ZWKZPGTI48KDX",
+          "DNSName": "foodray-alb-207342171.ap-northeast-2.elb.amazonaws.com.",
+          "EvaluateTargetHealth": false
+        }
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "api.foodray.net.",
+        "Type": "A",
+        "AliasTarget": {
+          "HostedZoneId": "ZWKZPGTI48KDX",
+          "DNSName": "foodray-alb-207342171.ap-northeast-2.elb.amazonaws.com.",
+          "EvaluateTargetHealth": false
+        }
+      }
+    }
+  ]
+}

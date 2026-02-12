@@ -133,13 +133,28 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         result_path = run_dir / "final" / ("final_translated.json" if run_step6 else "final.json")
         if not result_path.exists():
             raise FileNotFoundError(f"Menu assistant result not found: {result_path}")
-        return _json.loads(result_path.read_text(encoding="utf-8"))
+        final_obj = _json.loads(result_path.read_text(encoding="utf-8"))
+
+        rectified_path = run_dir / "rectify" / "rectified.jpg"
+        rectified_image = None
+        if rectified_path.exists():
+            img_b64 = base64.b64encode(rectified_path.read_bytes()).decode("ascii")
+            rectified_image = {
+                "mime": "image/jpeg",
+                "base64": img_b64,
+            }
+
+        return {
+            "final": final_obj,
+            "rectified_image": rectified_image,
+            "run_id": run_id,
+        }
 
     raise ValueError(f"Unsupported task: {task}")
 
 
 def main() -> None:
-    _load_secret_from_file("OPENAI_API_KEY")
+    _load_secret_from_file("GEMINI_API_KEY")
     _load_secret_from_file("DB_PASSWORD")
     _load_secret_from_file("JWT_SECRET_KEY")
 

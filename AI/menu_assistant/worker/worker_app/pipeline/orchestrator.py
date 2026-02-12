@@ -439,8 +439,13 @@ class PipelineOrchestrator:
             step4_env["MENU_ASSISTANT_CHROMA_DIR"] = str(chroma_dir)
             step4_env["MENU_ASSISTANT_COLLECTION"] = step4.collection
 
-            print("\n[RAG] using chroma_dir  =", step4_env["MENU_ASSISTANT_CHROMA_DIR"])
-            print("[RAG] using collection =", step4_env["MENU_ASSISTANT_COLLECTION"])
+            print("\n[RAG] using chroma_dir   =", step4_env["MENU_ASSISTANT_CHROMA_DIR"])
+            print("[RAG] using collection  =", step4_env["MENU_ASSISTANT_COLLECTION"])
+
+            menu_index_json = os.environ.get(
+                "MENU_ASSISTANT_MENU_INDEX_JSON",
+                "/tmp/menu_seed_with_alg_tags_variants_v3.json",
+            )
 
             cmd4 = [
                 sys.executable,
@@ -449,7 +454,32 @@ class PipelineOrchestrator:
                 "--run_id", run_id,
                 "--data_dir", str(self.data_dir),
                 "--run_dir", str(run_dir),
+                "--top_k",
+                str(step4.top_k),
+                "--embed_ambiguous",
+                str(step4.embed_ambiguous),
+                "--jamo_threshold",
+                str(step4.jamo_threshold),
+                "--score_threshold",
+                str(step4.score_threshold),
+                "--save_top_n",
+                str(step4.save_top_n),
+
+                # (호환용: step_04는 받기만 함)
+                "--rerank_top_k",
+                str(step4.rerank_top_k),
+                "--menu_index_json",
+                menu_index_json
             ]
+
+            if step4.use_rerank:
+                cmd4 += ["--use_rerank"]
+            else:
+                cmd4 += ["--no_rerank"]
+
+            if step4.include_debug:
+                cmd4 += ["--include_debug"]
+
             run_cmd(cmd4, env=step4_env, cwd=self.ai_root)
             ensure_exists(rag_match_json, "Step04 expected output missing (rag_match json)")
             _mark("step04_rag_match", t0)

@@ -20,6 +20,7 @@ Policy:
 
 # --------- ENV routing (keep project conventions) ----------
 ENV_CHROMA_DIR = "MENU_ASSISTANT_CHROMA_DIR"
+ENV_CHROMA_S3_PREFIX = "MENU_ASSISTANT_CHROMA_S3_PREFIX"
 ENV_COLLECTION = "MENU_ASSISTANT_COLLECTION"
 ENV_EMBED_MODEL = "MENU_ASSISTANT_EMBED_MODEL"
 
@@ -48,6 +49,130 @@ def _split_csv_like(v: Any) -> List[str]:
     return [p for p in parts if p]
 
 
+def _parse_s3_uri(uri: str) -> Tuple[str, str]:
+    if not uri.startswith("s3://"):
+        raise ValueError(f"invalid s3 uri: {uri}")
+    parts = uri[5:].split("/", 1)
+    bucket = parts[0]
+    prefix = parts[1] if len(parts) > 1 else ""
+    return bucket, prefix
+
+
+def _download_s3_prefix(uri: str, dest_dir: Path) -> None:
+    # Lazy import to avoid hard dependency if not used
+    import boto3
+
+    bucket, prefix = _parse_s3_uri(uri)
+    client = boto3.client("s3")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    continuation = None
+    while True:
+        kwargs = {"Bucket": bucket, "Prefix": prefix}
+        if continuation:
+            kwargs["ContinuationToken"] = continuation
+        resp = client.list_objects_v2(**kwargs)
+        for obj in resp.get("Contents", []):
+            key = obj.get("Key", "")
+            if key.endswith("/"):
+                continue
+            rel = key[len(prefix):] if key.startswith(prefix) else key
+            rel = rel.lstrip("/")
+            out_path = dest_dir / rel
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            client.download_file(bucket, key, str(out_path))
+        if not resp.get("IsTruncated"):
+            break
+        continuation = resp.get("NextContinuationToken")
+
+
+def _to_similarity(distance: Optional[float]) -> float:
+    """Chroma distance -> similarity in [0,1] for cosine distance (1 - distance)."""
+    if distance is None:
+        return 0.0
+    try:
+        d = float(distance)
+    except Exception:
+        return 0.0
+    return 1.0 - d
+
+
+def _parse_metadata(md: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "menu": _norm_space(str(md.get("menu", ""))),
+        "variants": _split_csv(md.get("variants", "")),
+        "ingredients_ko": _split_csv(md.get("ingredients_ko", "")),
+        "alg_tags": _split_csv(md.get("alg_tags", "")),
+        "source": _norm_space(str(md.get("source", ""))),
+    }
+
+
+# ==============================
+# JAMO SIMILARITY (typo-robust)
+# ==============================
+_SBASE = 0xAC00
+_LBASE = 0x1100
+_VBASE = 0x1161
+_TBASE = 0x11A7
+_LCOUNT = 19
+_VCOUNT = 21
+_TCOUNT = 28
+_NCOUNT = _VCOUNT * _TCOUNT
+_SCOUNT = _LCOUNT * _NCOUNT
+
+
+def _hangul_to_jamo(s: str) -> str:
+    out: List[str] = []
+    for ch in s:
+        code = ord(ch)
+        if _SBASE <= code < (_SBASE + _SCOUNT):
+            sindex = code - _SBASE
+            l = _LBASE + (sindex // _NCOUNT)
+            v = _VBASE + ((sindex % _NCOUNT) // _TCOUNT)
+            t = _TBASE + (sindex % _TCOUNT)
+            out.append(chr(l))
+            out.append(chr(v))
+            if t != _TBASE:
+                out.append(chr(t))
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def _levenshtein(a: str, b: str) -> int:
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, start=1):
+        cur = [i]
+        for j, cb in enumerate(b, start=1):
+            ins = cur[j - 1] + 1
+            dele = prev[j] + 1
+            sub = prev[j - 1] + (0 if ca == cb else 1)
+            cur.append(min(ins, dele, sub))
+        prev = cur
+    return prev[-1]
+
+
+def jamo_similarity(a: str, b: str) -> float:
+    a = _norm_space(a)
+    b = _norm_space(b)
+    if not a or not b:
+        return 0.0
+    ja = _hangul_to_jamo(a)
+    jb = _hangul_to_jamo(b)
+    dist = _levenshtein(ja, jb)
+    denom = max(len(ja), len(jb), 1)
+    return float(max(0.0, 1.0 - (dist / denom)))
+
+
+# ==============================
+# DATA STRUCTURES
+# ==============================
 @dataclass
 class ConfirmedMenu:
     menu_id: str
@@ -84,9 +209,10 @@ class ChromaMenuRetriever:
         if self._collection is not None:
             return
 
-        if self.chroma_dir is None:
-            raise RuntimeError(f"[RAG] chroma_dir is not set. Set env {ENV_CHROMA_DIR} or pass chroma_dir.")
-
+        if not self.chroma_dir.exists():
+            s3_prefix = os.environ.get(ENV_CHROMA_S3_PREFIX, "").strip()
+            if s3_prefix:
+                _download_s3_prefix(s3_prefix, self.chroma_dir)
         if not self.chroma_dir.exists():
             raise RuntimeError(f"[RAG] chroma_dir does not exist: {self.chroma_dir}")
 

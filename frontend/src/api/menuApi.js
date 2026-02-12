@@ -25,4 +25,16 @@ export const MenuAPI = {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
+  getMenuJob: (jobId) => api.get(`/menu/job/${jobId}`),
+  waitMenuJob: async (jobId, opts = {}) => {
+    const intervalMs = opts.intervalMs ?? 2000;
+    const maxAttempts = opts.maxAttempts ?? 90;
+    for (let i = 0; i < maxAttempts; i += 1) {
+      const res = await MenuAPI.getMenuJob(jobId);
+      const status = res?.data?.status;
+      if (status === "DONE" || status === "FAILED") return res;
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    throw new Error("menu job timeout");
+  },
 };

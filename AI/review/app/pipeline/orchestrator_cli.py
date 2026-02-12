@@ -22,7 +22,7 @@ def main():
         run_name=args.name,
         naver_cfg={
             "client_id": os.getenv("NAVER_CLIENT_ID", ""),
-            "client_secret": os.getenv("NAVER_API_KEY", ""),
+            "client_secret": os.getenv("NAVER_CLIENT_SECRET", ""),
         },
         gemini_api_key=os.getenv("GEMINI_API_KEY"),
     )

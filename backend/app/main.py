@@ -5,6 +5,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT_DIR))
 
 import asyncio
+import os
 from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -34,14 +35,20 @@ class ForceUTF8Middleware(BaseHTTPMiddleware):
             response.headers["content-type"] = "application/json; charset=utf-8"
         return response
 
+def _parse_cors_origins():
+    raw = os.getenv("CORS_ORIGINS", "")
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://foodray.net",
+        "https://www.foodray.net",
         # "http://localhost:5173",
         # "http://127.0.0.1:5173",
-    ],
+    ] + _parse_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -86,5 +93,3 @@ async def _tmp_cleanup_loop():
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(_tmp_cleanup_loop())
-
-    

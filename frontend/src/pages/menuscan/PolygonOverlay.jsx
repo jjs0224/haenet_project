@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
-import "./PolygonOverlay.css";
+// import "./PolygonOverlay.css";
+import './menuscan.css';
 
 /**
  * [final_translated 기준 + 하위호환]

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Any, Dict, Optional
 import json
@@ -14,10 +14,10 @@ from AI.review.app.pipeline.step_1_rectify.postprocess import PostprocessConfig,
 
 @dataclass
 class RectifyConfig:
-    pre: PreprocessConfig = PreprocessConfig()
-    crop: CropConfig = CropConfig()
+    pre: PreprocessConfig = field(default_factory=PreprocessConfig)
+    crop: CropConfig = field(default_factory=CropConfig)
     # deskew: DeskewConfig = DeskewConfig()
-    post: PostprocessConfig = PostprocessConfig()
+    post: PostprocessConfig = field(default_factory=PostprocessConfig)
     save_debug: bool = True
 
 def run_receipt_rectify(image_path: Path, out_dir: Path, cfg: RectifyConfig) -> PipelineResult:

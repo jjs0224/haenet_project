@@ -11,7 +11,7 @@ BANNED_MENU = set(START_KEYWORDS + STOP_KEYWORDS)
 
 # "포함되면 무조건 제외" (라벨류는 여기로)
 BLOCK_CONTAINS = [
-    "상품명", "품명", "메뉴", "수량", "단가", "금액",  # 컬럼 라벨
+    "층","가세", "과세", "상품명", "품명", "메뉴", "수량", "단가", "금액",  # 컬럼 라벨
 ]
 
 REMOVE_GAE_RE = re.compile(r"\b개\b")

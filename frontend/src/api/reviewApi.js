@@ -11,6 +11,18 @@ export const ReviewAPI = {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
+  getReceiptJob: (jobId) => api.get(`/review/receipt/job/${jobId}`),
+  waitReceiptJob: async (jobId, opts = {}) => {
+    const intervalMs = opts.intervalMs ?? 2000;
+    const maxAttempts = opts.maxAttempts ?? 90;
+    for (let i = 0; i < maxAttempts; i += 1) {
+      const res = await ReviewAPI.getReceiptJob(jobId);
+      const status = res?.data?.status;
+      if (status === "DONE" || status === "FAILED") return res;
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    throw new Error("review receipt job timeout");
+  },
 
   //  리뷰 생성(영수증 receipt_id 기반)
   createFromReceipt: ({ receipt_id, title, content, rating, location, menu_name, images }) => {

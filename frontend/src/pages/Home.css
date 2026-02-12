@@ -10,7 +10,7 @@
   background: #FAFAFA;
 
   /* app-main이 Header·BottomNav 갭을 전역으로 처리 → 여기서는 남은 영역만 채움 */
-  min-height: calc(100vh - 106px); /* Header(~16px pad) + BottomNav(90px pad) */
+  min-height: calc(100vh - 150px); /* Header(~16px pad) + BottomNav(90px pad) */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -26,8 +26,8 @@
 
 .home-logo-wrap {
   width: calc(100% - 24px);   /* 좌우 여백 12px씩 */
-  min-height: 180px;
-  max-height: 480px;
+  flex: none;
+  height: clamp(220px, 55vh, 420px);
 
   /* 남은 빈 공간을 로고가 모두 채움 → 버튼이 바로 아래로 붙음 */
   flex: 1 1 0%;

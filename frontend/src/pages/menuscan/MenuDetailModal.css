@@ -4,7 +4,7 @@
 .ms-mdm__overlay {
   position: fixed;
   inset: 0;
-  background: rgba(158, 192, 170, 0.52);   /* 그린 반투명 백드롭 */
+  background: rgba(27, 94, 32, 0.52);   /* 그린 반투명 백드롭 */
   display: flex;
   align-items: center;
   justify-content: center;

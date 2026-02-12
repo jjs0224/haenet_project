@@ -7,6 +7,7 @@ from backend.app.core.security.deps import get_current_member, oauth2_scheme
 from backend.app.features.auth import service, schemas
 
 from backend.app.core.security import jwt
+from backend.app.core import config
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -28,8 +29,9 @@ def login(
         key=COOKIE_NAME,
         value=refresh,
         httponly=True,
-        secure=False,   # https 배포면 True
-        samesite="lax",
+        secure=config.COOKIE_SECURE,   # https 배포면 True
+        samesite=config.COOKIE_SAMESITE,
+        domain=config.COOKIE_DOMAIN,
         path="/",
         max_age=ttl,
     )
@@ -54,8 +56,9 @@ def refresh(
         key=COOKIE_NAME,
         value=new_refresh,
         httponly=True,
-        secure=False,
-        samesite="lax",
+        secure=config.COOKIE_SECURE,
+        samesite=config.COOKIE_SAMESITE,
+        domain=config.COOKIE_DOMAIN,
         path="/",
         max_age=ttl,
     )
@@ -71,8 +74,8 @@ def logout(
     service.logout(db, token)
 
     # refresh cookie 삭제
-    response.delete_cookie(key=COOKIE_NAME, path="/")
-    response.delete_cookie(key=COOKIE_NAME, path="/auth")
+    response.delete_cookie(key=COOKIE_NAME, path="/", domain=config.COOKIE_DOMAIN)
+    response.delete_cookie(key=COOKIE_NAME, path="/auth", domain=config.COOKIE_DOMAIN)
     return {"ok": True}
 
 

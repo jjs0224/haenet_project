@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: worker-menu-assistant-prod
+  namespace: argocd
+spec:
+  project: app-platform
+
+  source:
+    repoURL: https://github.com/jjs0224/haenet_project
+    targetRevision: development
+    path: k8s/charts/worker
+    helm:
+      valueFiles:
+        - ../../env/prod/worker-menu-assistant-values.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: app-prod
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
+

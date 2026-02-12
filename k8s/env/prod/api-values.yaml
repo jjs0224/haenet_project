@@ -1,32 +1,41 @@
 image:
-    repository: 624280434939.dkr.ecr.ap-northeast-2.amazonaws.com/projecta-api
-    tag: dev-001
+    repository: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-api
+    tag: "sha-b8192dbea7b0a5ad60276d72992701dc362287be"
     pullPolicy: IfNotPresent
 
 env:
     APP_ENV: prod
-    DB_HOST: database-1.c7oeqq6c6a58.ap-northeast-2.rds.amazonaws.com
+    STORAGE_BACKEND: s3
+    LOCAL_UPLOAD_ROOT: /app/uploads
+    DB_HOST: heanet-rds-db.chm8ecgk8z74.ap-northeast-2.rds.amazonaws.com
     DB_PORT: "3306"
-    DB_NAME: app_db
-    DB_USER: app_user
-    REDIS_URL: "redis://redis-master.app-prod.svc.cluster.local:6379/0"
+    DB_NAME: foodray_db_rds
+    DB_USER: admin
+    REDIS_URL: "redis://redis.app-prod.svc.cluster.local:6379/0"
     QUEUE_NAME_MENU_ASSISTANT: "cicdex:jobs:menu_assistant"
     QUEUE_NAME_JOURNAL: "cicdex:jobs:journal"
     QUEUE_NAME_REVIEW: "cicdex:jobs:review"
-
-secretsMount:
-    enabled: true
-    mountPath: /run/app-secrets
-    dbPasswordKey: db_password
-    jwtSecretKeyKey: jwt_secret_key
+    COOKIE_DOMAIN: ".foodray.net"
+    COOKIE_SECURE: "true"
+    COOKIE_SAMESITE: "none"
 
 secret:
-    enabled: true
+    enabled: false
     dbPassword: PROD_DB_PASSWORD_CHANGE_ME
     jwtSecretKey: PROD_JWT_CHANGE_ME
 
 ingress:
     enabled: true
-    className: nginx
-    host: app.example.com
-    path: /api
+    className: alb
+    host: api.foodray.net
+    path: /
+    pathType: Prefix
+    annotations:
+        alb.ingress.kubernetes.io/scheme: internet-facing
+        alb.ingress.kubernetes.io/target-type: ip
+        alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+        alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:690641653744:certificate/4114d219-b52b-4b56-921b-b2067fd1a3c0
+        alb.ingress.kubernetes.io/ssl-redirect: "443"
+        alb.ingress.kubernetes.io/group.name: foodray
+        alb.ingress.kubernetes.io/load-balancer-name: foodray-alb
+        alb.ingress.kubernetes.io/healthcheck-path: /health

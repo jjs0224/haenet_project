@@ -202,6 +202,8 @@ def deskew_image_and_polys(
 
     meta["applied"] = True
     meta["applied_angle_deg"] = apply
+    print("deskew 되고있니..? ")
+
     return rotated_img, out_items, meta
 
 

@@ -4,12 +4,10 @@
 # - ClusterIP 내부 전용
 
 auth:
-    enabled: true
-    password: PROD_REDIS_PASSWORD_CHANGE_ME
+    enabled: false
 
 persistence:
-    enabled: true
-    size: 8Gi
+    enabled: false
 
 service:
     type: ClusterIP
