@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ReviewAPI } from "../../api/reviewApi";
 import { useNavigate } from "react-router-dom";
-import CaptureFlow from "../../components/camera/CaptureFlow";
+import CaptureFlow from "../../components/camera/CaptureFlow"; // ✅ add
 import styles from "./ReviewCreate.module.css";
 
 export default function ReviewCreateInline({ onCreated }) {
@@ -10,29 +10,29 @@ export default function ReviewCreateInline({ onCreated }) {
   // Step1
   const [receiptFile, setReceiptFile] = useState(null);
   const [receiptPreviewUrl, setReceiptPreviewUrl] = useState(null);
-  const [receiptId, setReceiptId] = useState(null); // ✅ 운영에서는 job_id를 receipt_id처럼 사용
+  const [receiptId, setReceiptId] = useState(null);
   const [extracted, setExtracted] = useState(null);
   const [menuList, setMenuList] = useState([]);
   const [menuConfirmed, setMenuConfirmed] = useState(false);
 
-  // camera toggle
+  // ✅ camera toggle
   const [showCamera, setShowCamera] = useState(false);
 
-  // Step2
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [rating, setRating] = useState(5);
+    // Step2
+    const [title, setTitle] = useState("");
+    const [content, setContent] = useState("");
+    const [rating, setRating] = useState(5);
 
   const [images, setImages] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
 
-  const receiptInputRef = useRef(null);
-  const imageInputRef = useRef(null);
+    const receiptInputRef = useRef(null);
+    const imageInputRef = useRef(null);
 
-  const [loadingVerify, setLoadingVerify] = useState(false);
-  const [loadingCreate, setLoadingCreate] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [err, setErr] = useState("");
+    const [loadingVerify, setLoadingVerify] = useState(false);
+    const [loadingCreate, setLoadingCreate] = useState(false);
+    const [msg, setMsg] = useState("");
+    const [err, setErr] = useState("");
 
   useEffect(() => {
     previewUrls.forEach((u) => URL.revokeObjectURL(u));
@@ -42,160 +42,120 @@ export default function ReviewCreateInline({ onCreated }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [images]);
 
-  // ✅ extracted 응답이 환경/버전에 따라 구조가 달라도 UI가 깨지지 않도록 정규화
-  const normalizeExtracted = (raw) => {
-    if (!raw || typeof raw !== "object") return null;
+    const verify = async () => {
+  setErr("");
+  setMsg("");
+  if (!receiptFile) return setErr("Please select the image of the receipt");
 
-    const store = raw.store && typeof raw.store === "object" ? raw.store : {};
+  setLoadingVerify(true);
 
-    const store_name =
-      raw.store_name ||
-      store.store_name ||
-      store.name_ko ||
-      store.name ||
-      raw.storeName ||
-      "";
+  try {
+    // 1) enqueue
+    const r = await ReviewAPI.verifyReceipt(receiptFile);
+    const jobId = r.data?.job_id;
+    if (!jobId) throw new Error("No job_id returned");
 
-    const store_name_en =
-      raw.store_name_en ||
-      store.store_name_en ||
-      store.name_en ||
-      raw.storeNameEn ||
-      "";
+    // 2) poll until DONE/FAILED
+    const jobRes = await ReviewAPI.waitReceiptJob(jobId);
+    const ext = jobRes?.data?.extracted ?? null;
 
-    const coords = raw.coords || store.coords || null;
+    console.log("✅ jobRes status:", jobRes?.data?.status);
+    console.log("✅ extracted keys:", ext ? Object.keys(ext) : null);
+    console.log("✅ extracted:", ext);
 
-    // menu_en: 배열/문자열/객체배열 다 대응
-    let menu_en = raw.menu_en;
-    if (!menu_en && Array.isArray(raw.menu)) {
-      menu_en = raw.menu
-        .map((m) => (m && typeof m === "object" ? m.name_en : null))
-        .filter(Boolean);
+    if (!ext) throw new Error("No extracted payload returned");
+
+    // ✅ receipt_id는 jobId로 사용
+    setReceiptId(jobId);
+    setExtracted(ext);
+
+    // 3) coords validate (coords or location fallback)
+    const coords = ext.coords ?? ext.location ?? null;
+    const x = coords?.x ?? coords?.[0] ?? null;
+    const y = coords?.y ?? coords?.[1] ?? null;
+
+    console.log("coords :: x, y :: ", coords)
+    console.log("coords :: x, y :: ", x)
+    console.log("coords :: x, y :: ", y)
+
+    if (x == null || y == null) {
+      alert("Please attach the receipt with the store address again");
+
+      // reset
+      setReceiptFile(null);
+      if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+      setReceiptPreviewUrl(null);
+      setMenuList([]);
+      setShowCamera(false);
+      if (receiptInputRef.current) receiptInputRef.current.value = "";
+      return;
     }
 
-    return {
-      ...raw,
-      store_name,
-      store_name_en,
-      coords,
-      menu_en,
-    };
-  };
+    // 4) menu list (menu_en or menu_name fallback)
+    const rawMenu = ext.menu_en ?? ext.menu_name ?? ext.menu ?? null;
+    if (rawMenu) {
+      let parsed = [];
 
-  const resetVerifyState = () => {
+      if (Array.isArray(rawMenu)) {
+        parsed = rawMenu.map((m) => String(m).replace(/["[\]]/g, "").trim());
+      } else if (typeof rawMenu === "string") {
+        // JSON 배열 문자열일 수도 있어서 한번 시도
+        try {
+          const j = JSON.parse(rawMenu);
+          parsed = Array.isArray(j) ? j.map((m) => String(m).trim()) : [String(j).trim()];
+        } catch {
+          parsed = String(rawMenu)
+            .split(",")
+            .map((m) => m.replace(/["[\]]/g, "").trim());
+        }
+      } else {
+        parsed = [String(rawMenu).trim()];
+      }
+
+      setMenuList(parsed.filter(Boolean));
+    } else {
+      setMenuList([]);
+    }
+
+    setMsg("Receipt certified. Please check the menu.");
+  } catch (e) {
+    setErr(e?.response?.data?.detail || e?.message || "Receipt authentication failed");
+  } finally {
+    setLoadingVerify(false);
+  }
+};
+
+
+
+    const confirmMenu = () => {
+        setMenuConfirmed(true);
+        setMsg("Checked the menu. Please write a review.");
+    };
+
+  const cancelMenu = () => {
     setReceiptId(null);
     setExtracted(null);
     setMenuList([]);
-    setMenuConfirmed(false);
-    setMsg("");
-    setErr("");
-  };
-
-  const hardResetReceiptInputs = () => {
     setReceiptFile(null);
     if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
     setReceiptPreviewUrl(null);
+    setMenuConfirmed(false);
     setShowCamera(false);
+    setMsg("");
+    setErr("");
     if (receiptInputRef.current) receiptInputRef.current.value = "";
   };
 
-  // ✅ 핵심 수정: verifyReceipt(202 job) → waitReceiptJob(DONE payload) → extracted 사용
-  const verify = async () => {
-    setErr("");
-    setMsg("");
-    if (!receiptFile) return setErr("Please select the image of the receipt");
-
-    setLoadingVerify(true);
-    try {
-      // 1) enqueue (보통 202 + job_id)
-      const r = await ReviewAPI.verifyReceipt(receiptFile);
-      const jobId = r?.data?.job_id || r?.data?.receipt_id || r?.data?.id;
-
-      if (!jobId) throw new Error("verify response has no job_id");
-
-      setReceiptId(jobId);
-      setMsg("Receipt verification queued. Checking result...");
-
-      // 2) poll until DONE/FAILED
-      const res = await ReviewAPI.waitReceiptJob(jobId, {
-        intervalMs: 2000,
-        maxAttempts: 90,
-      });
-
-      const status = res?.data?.status;
-      if (status !== "DONE") {
-        const emsg =
-          res?.data?.error?.message ||
-          res?.data?.detail ||
-          res?.data?.error ||
-          "Receipt authentication failed";
-        throw new Error(emsg);
-      }
-
-      // 3) DONE payload: extracted / final / payload 등 방어적으로 지원
-      const rawExt =
-        res?.data?.extracted ||
-        res?.data?.final ||
-        res?.data?.payload ||
-        null;
-
-      const ext = normalizeExtracted(rawExt);
-
-      // coords 체크 (ext.coords 또는 ext.store.coords)
-      const coords = ext?.coords;
-      if (!coords || coords.x == null || coords.y == null) {
-        alert("Please attach the receipt with the store address again");
-
-        // reset
-        resetVerifyState();
-        hardResetReceiptInputs();
-        setLoadingVerify(false);
-        return;
-      }
-
-      setExtracted(ext);
-
-      // menu_en parsing
-      if (ext?.menu_en) {
-        const raw = ext.menu_en;
-        const parsed = Array.isArray(raw)
-          ? raw.map((m) => String(m).replace(/["[\]]/g, "").trim())
-          : String(raw)
-              .split(",")
-              .map((m) => m.replace(/["[\]]/g, "").trim());
-        setMenuList(parsed.filter(Boolean));
-      }
-
-      setMsg("Receipt certified. Please check the menu.");
-    } catch (e) {
-      // ✅ axiosInstance 인터셉터에서 Error로 변환해서 던지므로 e.response 접근하면 안 됨
-      setErr(e?.message || "Receipt authentication failed");
-      resetVerifyState();
-    } finally {
-      setLoadingVerify(false);
-    }
-  };
-
-  const confirmMenu = () => {
-    setMenuConfirmed(true);
-    setMsg("Checked the menu. Please write a review.");
-  };
-
-  const cancelMenu = () => {
-    resetVerifyState();
-    hardResetReceiptInputs();
-  };
-
-  const removeMenu = (idx) => {
-    setMenuList((prev) => prev.filter((_, i) => i !== idx));
-  };
+    const removeMenu = (idx) => {
+        setMenuList((prev) => prev.filter((_, i) => i !== idx));
+    };
 
   const onPickImages = (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
-    setErr("");
-    setMsg("");
+        setErr("");
+        setMsg("");
 
     setImages((prev) => {
       const merged = [...prev, ...files];
@@ -213,20 +173,19 @@ export default function ReviewCreateInline({ onCreated }) {
     setImages((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const create = async () => {
-    setErr("");
-    setMsg("");
+    const create = async () => {
+        setErr("");
+        setMsg("");
 
-    if (!receiptId) return setErr("Please verify the receipt first");
-    if (!title.trim()) return setErr("Please enter the title");
-    if (!content.trim()) return setErr("Please enter the content");
-    if (images.length > 3) return setErr("upload up to three images.");
+        if (!receiptId) return setErr("Please verify the receipt first");
+        if (!title.trim()) return setErr("Please enter the title");
+        if (!content.trim()) return setErr("Please enter the content");
+        if (images.length > 3) return setErr("upload up to three images.");
 
     setLoadingCreate(true);
     try {
-      // ⚠️ 기존 프론트 API는 /review/create 로 전송하고 있음(너 프로젝트 기준 유지)
       const r = await ReviewAPI.createFromReceipt({
-        receipt_id: receiptId,                 // ✅ job_id를 그대로 receipt_id로 사용
+        receipt_id: receiptId,
         title,
         content,
         rating,
@@ -238,15 +197,20 @@ export default function ReviewCreateInline({ onCreated }) {
       navigate("/review?mine=true");
       onCreated?.(r.data);
 
-      // reset all
-      hardResetReceiptInputs();
-      resetVerifyState();
+      setReceiptFile(null);
+      if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+      setReceiptPreviewUrl(null);
+      setReceiptId(null);
+      setExtracted(null);
+      setMenuList([]);
+      setMenuConfirmed(false);
+      setShowCamera(false);
       setTitle("");
       setContent("");
       setRating(5);
       setImages([]);
     } catch (e) {
-      setErr(e?.message || "Failed to create review");
+      setErr(e?.response?.data?.detail || e?.message || "Failed to create review");
     } finally {
       setLoadingCreate(false);
     }
@@ -270,17 +234,19 @@ export default function ReviewCreateInline({ onCreated }) {
         <div className={styles.stepSection}>
           <div className={styles.stepHeader}>Verify Receipt</div>
 
+          {/*  camera page */}
           {showCamera && !receiptFile && (
             <CaptureFlow
               onDone={(file) => {
                 setReceiptFile(file);
                 if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
                 setReceiptPreviewUrl(URL.createObjectURL(file));
-                setShowCamera(false);
+                setShowCamera(false); // back to normal UI
               }}
             />
           )}
 
+          {/*  normal upload UI (your original) */}
           {!showCamera && (
             <>
               <div className={styles.receiptUpload}>
@@ -298,6 +264,7 @@ export default function ReviewCreateInline({ onCreated }) {
                   className={styles.fileInput}
                 />
 
+                {/*  new camera button beside check */}
                 <button
                   type="button"
                   onClick={() => {
@@ -306,7 +273,7 @@ export default function ReviewCreateInline({ onCreated }) {
                     setShowCamera(true);
                   }}
                   disabled={loadingVerify}
-                  className={styles.btnCamera}
+                  className={styles.btnCamera} // (or reuse btnPrimary if you want)
                   title="Open Camera"
                 >
                   📷
@@ -342,12 +309,10 @@ export default function ReviewCreateInline({ onCreated }) {
           <p>
             {extracted.store_name} / {extracted.store_name_en}
           </p>
-
           <div className={styles.menuConfirmSection}>
             {!menuConfirmed && (
               <p className={styles.menuConfirmText}>Please only select your menu</p>
             )}
-
             <div className={styles.menuList}>
               {menuList.length > 0 ? (
                 menuList.map((menu, idx) => (
@@ -470,8 +435,14 @@ export default function ReviewCreateInline({ onCreated }) {
         </div>
       )}
 
-      {msg && <div className={`${styles.message} ${styles.success}`}>{msg}</div>}
-      {err && <div className={`${styles.message} ${styles.error}`}>{err}</div>}
-    </div>
-  );
+            {msg && (
+                <div className={`${styles.message} ${styles.success}`}>
+                    {msg}
+                </div>
+            )}
+            {err && (
+                <div className={`${styles.message} ${styles.error}`}>{err}</div>
+            )}
+        </div>
+    );
 }

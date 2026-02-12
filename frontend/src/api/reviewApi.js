@@ -54,7 +54,7 @@ export const ReviewAPI = {
     }
 
     // ✅ 여기 한 줄이 빌드 깨던 원인 (axiosInstance -> api)
-    return api.post("/review/receipt/create", fd);
+    return api.post("/review/create", fd);
   },
 
   //  전체 리뷰 리스트

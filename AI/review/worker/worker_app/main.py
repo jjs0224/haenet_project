@@ -125,6 +125,10 @@ def main() -> None:
     _load_secret_from_file("DB_PASSWORD")
     _load_secret_from_file("JWT_SECRET_KEY")
 
+    # ✅ 추가 (FILE 기반 시크릿이면 필수)
+    _load_secret_from_file("NAVER_CLIENT_ID")
+    _load_secret_from_file("NAVER_CLIENT_SECRET")
+
     redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
     queue_name = os.getenv("QUEUE_NAME", "cicdex:jobs")
     processing_name = os.getenv("QUEUE_PROCESSING_NAME", f"{queue_name}:processing")
@@ -136,6 +140,7 @@ def main() -> None:
     _log(f"[worker:{worker_id}] REDIS_URL={redis_url}")
     _log(f"[worker:{worker_id}] QUEUE_NAME={queue_name}")
     _log(f"[worker:{worker_id}] PROCESSING_NAME={processing_name}")
+
 
     try:
         r = _connect(redis_url)
