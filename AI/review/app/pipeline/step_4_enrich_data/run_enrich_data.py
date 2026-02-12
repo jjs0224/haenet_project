@@ -14,8 +14,8 @@ def enrich_data(
 ) -> Dict:
     store = None
 
-    client_id = (naver_cfg or {}).get("NAVER_CLIENT_ID") or (naver_cfg or {}).get("client_id")
-    client_secret = (naver_cfg or {}).get("NAVER_CLIENT_SECRET") or (naver_cfg or {}).get("client_secret")
+    client_id = (naver_cfg or {}).get("NAVER_CLIENT_ID")
+    client_secret = (naver_cfg or {}).get("NAVER_CLIENT_SECRET")
 
     # 1) phone search
     if phone:

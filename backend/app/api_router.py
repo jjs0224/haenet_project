@@ -10,6 +10,7 @@ from backend.app.features.review.router import router as review_router
 from backend.app.features.meta.router import router as meta_router
 from backend.app.features.community.router import router as community_router
 from backend.app.features.comment.router import router as comment_router
+from backend.app.features.jobs.router import router as jobs_router
 
 # router 전체 관리
 api_router = APIRouter()
@@ -24,3 +25,4 @@ api_router.include_router(review_router)
 api_router.include_router(meta_router)
 api_router.include_router(community_router)
 api_router.include_router(comment_router)
+api_router.include_router(jobs_router)
