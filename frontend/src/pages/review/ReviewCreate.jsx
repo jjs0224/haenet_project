@@ -50,7 +50,9 @@ export default function ReviewCreateInline({ onCreated }) {
     setLoadingVerify(true);
     try {
       const r = await ReviewAPI.verifyReceipt(receiptFile);
+      console.log("rrrrr :: ", r)
       const ext = r.data?.extracted || null;
+      console.log("ext :: ", ext)
 
       const coords = ext?.coords;
       if (!coords || coords.x == null || coords.y == null) {

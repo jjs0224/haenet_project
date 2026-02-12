@@ -105,6 +105,8 @@ async def verify_receipt(*, member_id: int, file: UploadFile, receipt_id: str) -
         log_exception("receipt.upload_reject", e)
         raise HTTPException(status_code=400, detail=str(e))
 
+    print("obj :: ", obj)
+
     # 2) 로컬 경로 확보
     local_path, cleanup = ensure_local_path(obj)
 

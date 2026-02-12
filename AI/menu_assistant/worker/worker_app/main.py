@@ -83,22 +83,68 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     if task == "menu_assistant_pipeline":
         import base64
         import json as _json
+        from dataclasses import asdict, is_dataclass
         from pathlib import Path
+
+        # NOTE: keep import path unchanged (project layout)
         from AI.menu_assistant.worker.worker_app.pipeline.orchestrator import (
             PipelineOrchestrator,
+            Step1Options,
+            Step2Options,
+            Step3Options,
+            Step4Options,
             Step5Options,
+            Step6Options,
             _default_runs_root,
         )
 
-        run_id = str(payload.get("run_id") or "").strip() or None
-        run_step4 = bool(payload.get("run_step4", True))
-        run_step5 = bool(payload.get("run_step5", True))
-        run_step6 = bool(payload.get("run_step6", True))
+        def _coerce_bool(v: Any, default: bool) -> bool:
+            if v is None:
+                return default
+            if isinstance(v, bool):
+                return v
+            if isinstance(v, (int, float)):
+                return bool(v)
+            s = str(v).strip().lower()
+            if s in ("1", "true", "t", "yes", "y", "on"):
+                return True
+            if s in ("0", "false", "f", "no", "n", "off"):
+                return False
+            return default
 
+        def _load_opts(cls, data: Any):
+            """
+            Build orchestrator option dataclass from dict (unknown keys ignored).
+            Also accepts an already-constructed instance.
+            """
+            if data is None:
+                return None
+            if is_dataclass(data):
+                return data
+            if not isinstance(data, dict):
+                return None
+
+            # allow both snake_case keys and older flat keys; ignore unknowns
+            allowed = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+            kwargs = {k: v for k, v in data.items() if k in allowed}
+            return cls(**kwargs)
+
+        run_id = str(payload.get("run_id") or "").strip() or None
+
+        # Execution flags (default: run step4~6)
+        run_step4 = _coerce_bool(payload.get("run_step4"), True)
+        run_step5 = _coerce_bool(payload.get("run_step5"), True)
+        run_step6 = _coerce_bool(payload.get("run_step6"), True)
+
+        # Paths
         runs_root = Path(payload.get("runs_root") or _default_runs_root()).expanduser().resolve()
+        data_dir = payload.get("data_dir")
+        data_dir_path = Path(data_dir).expanduser().resolve() if data_dir else None
+
         tmp_dir = runs_root / "tmp"
         tmp_dir.mkdir(parents=True, exist_ok=True)
 
+        # Image input: prefer image_path; fallback to image_base64
         image_path = payload.get("image_path")
         if image_path:
             image_path = Path(image_path).expanduser().resolve()
@@ -110,6 +156,7 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             image_path = tmp_dir / f"menu_{run_id or uuid.uuid4().hex}.jpg"
             image_path.write_bytes(img_bytes)
 
+        # User profile (supports dict -> temp json, or explicit json path)
         user_profile = payload.get("user_profile")
         user_profile_json = payload.get("user_profile_json")
         if user_profile and not user_profile_json:
@@ -117,22 +164,61 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             profile_path.write_text(_json.dumps(user_profile, ensure_ascii=False), encoding="utf-8")
             user_profile_json = str(profile_path)
 
-        step5 = Step5Options(user_profile_json=user_profile_json)
+        # Options: allow nested dicts: step1..step6
+        step1 = _load_opts(Step1Options, payload.get("step1"))
+        step2 = _load_opts(Step2Options, payload.get("step2"))
+        step3 = _load_opts(Step3Options, payload.get("step3"))
+        step4 = _load_opts(Step4Options, payload.get("step4"))
+        step5 = _load_opts(Step5Options, payload.get("step5")) or Step5Options()
+        step6 = _load_opts(Step6Options, payload.get("step6"))
 
-        orch = PipelineOrchestrator(runs_root)
+        # Backward-compatible Step5 flat keys (if provided)
+        if user_profile_json:
+            step5.user_profile_json = user_profile_json
+
+        if "include_debug" in payload:
+            step5.include_debug = _coerce_bool(payload.get("include_debug"), step5.include_debug)
+        if "require_poly" in payload:
+            step5.require_poly = _coerce_bool(payload.get("require_poly"), step5.require_poly)
+        if "max_retries" in payload and payload.get("max_retries") is not None:
+            step5.max_retries = int(payload.get("max_retries"))
+
+        # speed patch (optional)
+        if payload.get("chunk_size") is not None:
+            step5.chunk_size = int(payload.get("chunk_size"))
+        if payload.get("workers") is not None:
+            step5.workers = int(payload.get("workers"))
+        if payload.get("use_cache") is not None:
+            step5.use_cache = _coerce_bool(payload.get("use_cache"), step5.use_cache)
+
+        orch = PipelineOrchestrator(runs_root, data_dir=data_dir_path)
         run_dir = orch.run(
             image_path=image_path,
             run_id=run_id,
+            step1=step1,
+            step2=step2,
+            step3=step3,
+            step4=step4,
             step5=step5,
+            step6=step6,
             run_step4=run_step4,
             run_step5=run_step5,
             run_step6=run_step6,
             do_check=False,
         )
 
-        result_path = run_dir / "final" / ("final_translated.json" if run_step6 else "final.json")
+        # Preferred entrypoint when Step06 ran: final/final_output.json -> final/final_translated.json
+        final_output_path = run_dir / "final" / "final_output.json"
+        if run_step6 and final_output_path.exists():
+            meta = _json.loads(final_output_path.read_text(encoding="utf-8"))
+            rel = (((meta.get("final_output") or {}).get("relative_path")) or "").strip()
+            result_path = (run_dir / rel).resolve() if rel else (run_dir / "final" / "final_translated.json")
+        else:
+            result_path = run_dir / "final" / ("final_translated.json" if run_step6 else "final.json")
+
         if not result_path.exists():
             raise FileNotFoundError(f"Menu assistant result not found: {result_path}")
+
         final_obj = _json.loads(result_path.read_text(encoding="utf-8"))
 
         rectified_path = run_dir / "rectify" / "rectified.jpg"
@@ -148,9 +234,12 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             "final": final_obj,
             "rectified_image": rectified_image,
             "run_id": run_id,
+            "run_dir": str(run_dir),
+            "result_path": str(result_path),
+            "final_output_path": str(final_output_path) if final_output_path.exists() else None,
         }
 
-    raise ValueError(f"Unsupported task: {task}")
+    raise ValueError(f"Unsupported task: {task}")(f"Unsupported task: {task}")
 
 
 def main() -> None:
