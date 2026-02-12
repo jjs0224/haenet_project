@@ -50,7 +50,25 @@ export default function ReviewCreateInline({ onCreated }) {
     setLoadingVerify(true);
     try {
       const r = await ReviewAPI.verifyReceipt(receiptFile);
-      const ext = r.data?.extracted || null;
+      const jobId = r.data?.job_id;
+      if (!jobId) {
+        throw new Error("Receipt job id missing");
+      }
+
+      const jobRes = await ReviewAPI.waitReceiptJob(jobId, {
+        intervalMs: 2000,
+        maxAttempts: 90,
+      });
+      const status = jobRes?.data?.status;
+      if (status === "FAILED") {
+        const errMsg =
+          jobRes?.data?.error?.detail ||
+          jobRes?.data?.error ||
+          "Receipt analysis failed";
+        throw new Error(errMsg);
+      }
+
+      const ext = jobRes?.data?.extracted || null;
 
       const coords = ext?.coords;
       if (!coords || coords.x == null || coords.y == null) {
@@ -69,7 +87,7 @@ export default function ReviewCreateInline({ onCreated }) {
         return;
       }
 
-      setReceiptId(r.data?.receipt_id);
+      setReceiptId(jobId);
       setExtracted(ext);
 
       if (ext?.menu_en) {
