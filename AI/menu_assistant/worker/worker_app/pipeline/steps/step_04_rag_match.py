@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 from menu_assistant.worker.worker_app.rag.retrieval import match_menu_norm
 
@@ -144,36 +143,26 @@ def _write_json(path: Path, obj: Any) -> None:
         json.dump(obj, f, ensure_ascii=False, indent=2)
 
 
-def _resolve_run_dir(data_dir: Path, run_id: str) -> Path:
-    return data_dir / "runs" / run_id
-
-
 def _extract_items(normalized: Any) -> List[Dict[str, Any]]:
-    # Step03 standard schema: {"items": [...]}
-    if isinstance(normalized, dict):
-        if isinstance(normalized.get("items"), list):
-            return normalized["items"]
-        for k in ("items_merged", "lines", "results"):
-            if isinstance(normalized.get(k), list):
-                return normalized[k]
-        raise ValueError(f"normalize json schema not supported. keys={list(normalized.keys())}")
+    if isinstance(normalized, dict) and isinstance(normalized.get("items"), list):
+        return normalized["items"]
     if isinstance(normalized, list):
         return normalized
-    raise ValueError(f"normalize json must be dict or list, got {type(normalized)}")
+    raise ValueError("normalize.json schema not supported: expected dict{items:[]} or list.")
 
 
-def run_step_04_rag_match(
-    run_dir: Path,
-    top_k: int = 5,
-    save_top_n: int = 2,
-    embed_ambiguous: float = 0.90,
-    embed_confirmed: float = 0.95,
-    jamo_threshold: float = 0.85,
-    jamo_confirmed: float = 0.95,
-    score_threshold: float = 0.55,
-    include_debug: bool = False,
-    menu_index_json: Optional[str] = None,
-) -> Path:
+def _pick_poly(it: Dict[str, Any]) -> Any:
+    return (
+        it.get("poly")
+        or it.get("poly_menu")
+        or it.get("polybox")
+        or it.get("poly_box")
+        or it.get("polygon")
+        or None
+    )
+
+
+def run_step(run_dir: Path) -> Path:
     normalize_path = run_dir / "normalize" / "normalize.json"
     if not normalize_path.exists():
         alt = run_dir / "normalize" / "normalized.json"
@@ -185,28 +174,21 @@ def run_step_04_rag_match(
     normalized = _read_json(normalize_path)
     items = _extract_items(normalized)
 
-    # Optional: build exact-precheck variant map (does not change behavior if not provided)
-    exact_vmap = _load_menu_index_for_exact(menu_index_json)
-
-
     out_items: List[Dict[str, Any]] = []
-    stats: Dict[str, int] = {
-        "EXACT": 0,
-        "CONFIRMED_EMBED": 0,
-        "AMBIGUOUS_EMBED": 0,
-        "CONFIRMED_JAMO": 0,
-        "AMBIGUOUS_JAMO": 0,
-        "NOT_FOUND_EMPTY_QUERY": 0,
-        "NOT_FOUND_NO_CANDIDATES": 0,
-        "NOT_FOUND_BELOW_THRESHOLD": 0,
-        "TOTAL": 0,
-    }
+    stats = {"TOTAL": 0, "EXACT": 0, "UNKNOWN": 0}
 
-    for it in items:
+    # 기존: for it in items:
+    for idx, it in enumerate(items, start=1):
         if not isinstance(it, dict):
             continue
 
-        menu_norm = str(it.get("menu_norm") or "").strip()
+        # ✅ item_id 자동 생성 (없거나 null/빈값이면 순번 부여)
+        src_item_id = it.get("item_id", None)
+        if src_item_id is None or (isinstance(src_item_id, str) and src_item_id.strip() == ""):
+            item_id = f"itm_{idx:04d}"  # itm_0001, itm_0002 ...
+        else:
+            item_id = src_item_id
+
         raw_menu = str(
             it.get("raw_menu")
             or it.get("menu_raw")
@@ -216,91 +198,36 @@ def run_step_04_rag_match(
             or ""
         ).strip()
 
-        # ----------------------------------------------------
-        # EXACT precheck: if menu_norm exactly matches a known variant,
-        # return EXACT without embedding search.
-        # ----------------------------------------------------
-        exact_rag = _exact_precheck(menu_norm, exact_vmap)
-        if exact_rag is not None:
-            rag = exact_rag
-        else:
-            rag = match_menu_norm(
-            menu_norm=menu_norm,
-            raw_menu=raw_menu,
-            top_k=int(top_k),
-            save_top_n=int(save_top_n),
-            embed_ambiguous=float(embed_ambiguous),  # reserved / compat
-            jamo_threshold=float(jamo_threshold),
-            score_threshold=float(score_threshold),
-            include_debug=include_debug,
-        )
+        menu_norm = str(it.get("menu_norm") or "").strip()
 
-        merged = dict(it)
+        res = match_exact(menu_norm)
+        match_status = res.get("status", "unknown")
+        if match_status != "exact":
+            match_status = "unknown"
 
-        # Top-level convenience fields (stable contract for downstream LLM/service)
-        merged["raw_menu"] = raw_menu or merged.get("raw_menu")
-        merged["menu_norm"] = menu_norm or merged.get("menu_norm")
-        merged["menu_final"] = rag.get("decided_menu")
-        merged["match_status"] = rag.get("status")
-        merged["match_decision_method"] = rag.get("decision_method")
+        out_item: Dict[str, Any] = {
+            "item_id": item_id,  # ✅ 여기 null 대신 보장
+            "raw_menu": raw_menu,
+            "poly": _pick_poly(it),
+            "menu_norm": menu_norm,
+            "match_status": match_status,
+            "confirmed": res.get("confirmed") if match_status == "exact" else None,
 
-        # Match evidence (keep candidates/thresholds for LLM reasoning)
-        bm = rag.get("best_match") or {}
-        signals = rag.get("signals") or {}
-        merged["match"] = {
-            "used_query": rag.get("used_query"),
-            "best": {
-                "id": bm.get("id") if isinstance(bm, dict) else None,
-                "menu": bm.get("menu") if isinstance(bm, dict) else None,
-                "best_variant": bm.get("best_variant") if isinstance(bm, dict) else None,
-                "embed_score": bm.get("embed_score") if isinstance(bm, dict) else None,
-                "jamo_score": bm.get("jamo_score") if isinstance(bm, dict) else None,
-                "final_score": bm.get("final_score") if isinstance(bm, dict) else None,
-            },
-            "candidates": rag.get("candidates") or [],
-            "thresholds": (signals.get("thresholds") or {}) if isinstance(signals, dict) else {},
-            "debug": rag.get("debug") if include_debug else None,
         }
 
-        # Confirmed payload: ONLY when EXACT
-        if rag.get("status") == "EXACT" and isinstance(bm, dict):
-            merged["confirmed"] = {
-                "menu_id": bm.get("id"),
-                "menu": bm.get("menu"),
-                "ingredients_ko": bm.get("ingredients_ko"),
-                "alg_tags": bm.get("alg_tags"),
-            }
-        else:
-            merged["confirmed"] = None
-
-        # Backward-compat: keep raw rag output under rag_match if you still need it
-        merged["rag_match"] = rag
-
-        out_items.append(merged)
+        out_items.append(out_item)
 
         stats["TOTAL"] += 1
-        st = str(rag.get("status") or "")
-        stats[st] = stats.get(st, 0) + 1
+        if match_status == "exact":
+            stats["EXACT"] += 1
+        else:
+            stats["UNKNOWN"] += 1
 
     out_path = run_dir / "rag_match" / "rag_match.json"
     payload = {
         "run_dir": str(run_dir),
         "input_normalize": str(normalize_path),
-        "config": {
-            "top_k": int(top_k),
-            "save_top_n": int(save_top_n),
-            "embed_ambiguous": float(embed_ambiguous),
-            "jamo_threshold": float(jamo_threshold),
-            "reserved": {
-                "embed_confirmed": float(embed_confirmed),
-                "jamo_confirmed": float(jamo_confirmed),
-            },
-            "score_threshold": float(score_threshold),
-            "exact_precheck": {
-                "enabled": bool(exact_vmap is not None),
-                "menu_index_json": (menu_index_json or os.environ.get("MENU_ASSISTANT_MENU_INDEX_JSON") or None),
-            },
-        },
+        "config": {"policy": "EXACT_ONLY_CHROMA_MENU"},
         "stats": stats,
         "items": out_items,
     }
@@ -309,63 +236,17 @@ def run_step_04_rag_match(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        description="Step04 RAG match (menu_norm-only query, menu-only compare, granular statuses)"
-    )
-    p.add_argument("--run_id", type=str, required=False)
-    p.add_argument("--data_dir", type=str, default=None)
-    p.add_argument("--run_dir", type=str, default=None)
-
-    p.add_argument("--top_k", type=int, default=5)
-    p.add_argument("--save_top_n", type=int, default=2)
-
-    p.add_argument("--embed_ambiguous", type=float, default=0.90)
-    p.add_argument("--embed_confirmed", type=float, default=0.95)
-    p.add_argument("--jamo_threshold", type=float, default=0.85)
-    p.add_argument("--jamo_confirmed", type=float, default=0.95)
-    p.add_argument("--score_threshold", type=float, default=0.55)
-
-    # Backward-compatible CLI (orchestrator may still pass these)
-    p.add_argument("--rerank_top_k", type=int, default=0)
-    p.add_argument("--use_rerank", action="store_true")
-    p.add_argument("--no_rerank", action="store_true")
-
-    p.add_argument("--include_debug", action="store_true")
-    p.add_argument(
-        "--menu_index_json",
-        type=str,
-        default=menu_index_json,
-        help="Optional menu index json for STRING EXACT precheck. If omitted, uses env MENU_ASSISTANT_MENU_INDEX_JSON.",
-    )
+    p = argparse.ArgumentParser(description="Step04 RAG match (EXACT-only)")
+    p.add_argument("--run_id", type=str, required=True)
+    p.add_argument("--data_dir", type=str, required=True)
+    p.add_argument("--run_dir", type=str, required=True)
     return p
 
 
 def main() -> None:
     args = build_parser().parse_args()
-
-    repo_root = Path(__file__).resolve().parents[4]  # menu_assistant/
-    default_data_dir = repo_root / "data"
-    data_dir = Path(args.data_dir) if args.data_dir else default_data_dir
-
-    if args.run_dir:
-        run_dir = Path(args.run_dir)
-    else:
-        if not args.run_id:
-            raise ValueError("Either --run_dir or --run_id must be provided.")
-        run_dir = _resolve_run_dir(data_dir, args.run_id)
-
-    out_path = run_step_04_rag_match(
-        run_dir=run_dir,
-        top_k=args.top_k,
-        save_top_n=args.save_top_n,
-        embed_ambiguous=args.embed_ambiguous,
-        embed_confirmed=args.embed_confirmed,
-        jamo_threshold=args.jamo_threshold,
-        jamo_confirmed=args.jamo_confirmed,
-        score_threshold=args.score_threshold,
-        include_debug=args.include_debug,
-        menu_index_json=args.menu_index_json,
-    )
+    run_dir = Path(args.run_dir)
+    out_path = run_step(run_dir)
     print(f"[Step04] wrote: {out_path}")
 
 

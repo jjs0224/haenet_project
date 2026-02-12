@@ -14,4 +14,5 @@ export const RestrictionsAdminAPI = {
   batchCreate: (payload) => api.post("/admin/restrictions/batch", payload),
   updateCategory: (id, payload) => api.put(`/admin/restrictions/category/${id}`, payload),
   updateItem: (id, payload) => api.put(`/admin/restrictions/item/${id}`, payload),
+  addItemToCategory: (categoryId, payload) => api.post(`/admin/restrictions/category/${categoryId}/item`, payload),
 };

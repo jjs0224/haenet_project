@@ -25,19 +25,23 @@ class DocUNetConfig:
     Controls:
       - min_orientation_confidence: confidence below this => treat as uncertain
       - prefer_fallback_when_low_conf: if uncertain, prefer heuristic/candidate selection
-      - try_both_directions_when_uncertain: test 90/270 candidates and pick best by quad-detection quality
+      - prefer_doctr_when_tie: if 0deg vs doctr_inverse are nearly equal, prefer doctr prior (optional)
+      - tie_area_ratio: relative area difference threshold to consider a tie (0~1)
+      - prefer_keep0_when_close_score_epsilon: if best_score - score(0deg) <= epsilon, keep 0deg (prevents 180 flip on near-ties)
     """
     params: PerspectiveRectifyParams = PerspectiveRectifyParams()
     strict_weights: bool = False
-    #enable_orientation: DocTR로 회전 추정을 할지 여부
+
     enable_orientation: bool = True
-    #predictor가 낸 confidence가 이 값 미만이면 “불확실”로 판단
     min_orientation_confidence: float = 0.90
     prefer_fallback_when_low_conf: bool = True
-    #불확실한 경우 90/270 등 여러 후보를 실제로 돌려보고 최선 선택
-    try_both_directions_when_uncertain: bool = True
+
+    # doctr tie preference (optional)
     prefer_doctr_when_tie: bool = False
-    tie_area_ratio: float = 0.01  # 1% 이내면 동률로 간주
+    tie_area_ratio: float = 0.01  # 1% 이내면 동률
+
+    # 핵심: 근소차이면 0도 유지 (이번 케이스처럼 0 vs 180이 사실상 동률인데 180이 미세하게 이기는 문제 방지)
+    prefer_keep0_when_close_score_epsilon: float = 50.0
 
 
 class DocUNetBackend(RectifyBackend):
@@ -51,6 +55,8 @@ class DocUNetBackend(RectifyBackend):
 
       - If confidence is low or parsing fails, we fall back to heuristic candidate rotations
         and select the best one by document quad detection quality.
+
+      - SAFE fallback: if no candidate produces a valid quad, do NOT rotate.
     """
 
     name = "docunet"
@@ -126,10 +132,7 @@ class DocUNetBackend(RectifyBackend):
     # -------------------------
     @staticmethod
     def _normalize_angle(val: Any) -> Optional[int]:
-        """
-        Normalize angle-like values into one of {0, 90, 180, 270}.
-        Supports negative angles: -90 -> 270.
-        """
+        """Normalize angle-like values into one of {0, 90, 180, 270}. Supports -90 -> 270."""
         if val is None:
             return None
 
@@ -162,13 +165,11 @@ class DocUNetBackend(RectifyBackend):
           [[class_id], [angle_deg], [confidence]]
           e.g. [[1], [-90], [0.9]]
         """
-        # dict with angle key
         if isinstance(out, dict):
             for k in ("angle", "orientation", "rotation"):
                 if k in out:
                     return DocUNetBackend._normalize_angle(out[k])
 
-        # page_orientation_predictor observed output: [[cls], [angle], [conf]]
         if isinstance(out, (list, tuple)) and len(out) == 3:
             try:
                 angle_part = out[1]
@@ -180,20 +181,17 @@ class DocUNetBackend(RectifyBackend):
             except Exception:
                 pass
 
-        # batch list/tuple: try first element recursively
         if isinstance(out, (list, tuple)) and len(out) > 0:
             first = out[0]
             ang = DocUNetBackend._angle_from_doctr_output(first)
             if ang is not None:
                 return ang
 
-            # probability vector [p0,p90,p180,p270]
             if len(out) == 4 and all(isinstance(x, (int, float, np.floating, np.integer)) for x in out):
                 arr = np.array(out, dtype=float)
                 idx = int(arr.argmax())
                 return [0, 90, 180, 270][idx]
 
-        # numpy array probability vector
         if isinstance(out, np.ndarray):
             arr = out
             if arr.ndim == 2 and arr.shape[0] == 1:
@@ -206,10 +204,7 @@ class DocUNetBackend(RectifyBackend):
 
     @staticmethod
     def _confidence_from_doctr_output(out: Any) -> Optional[float]:
-        """
-        Extract confidence from page_orientation_predictor output:
-          [[class_id], [angle_deg], [confidence]]
-        """
+        """Extract confidence from page_orientation_predictor output: [[cls], [angle], [conf]]"""
         if isinstance(out, (list, tuple)) and len(out) == 3:
             try:
                 conf_part = out[2]
@@ -289,13 +284,10 @@ class DocUNetBackend(RectifyBackend):
     def _maybe_apply_orientation(self, image_bgr: np.ndarray) -> Tuple[np.ndarray, Dict[str, Any]]:
         """
         Orientation correction with:
-          - doctr prediction parsing (angle + confidence)
+          - doctr prediction parsing (angle + confidence) if available
           - confidence thresholding
-          - SAFE fallback: never rotate if all candidates fail to produce a valid document quad
-          - candidate testing (prefer 0-degree first for safety)
-          -  tie-break: if 0 vs doctr_inverse are nearly equal, prefer doctr_inverse
-          -  NEW: predictor unavailable -> still run SAFE fallback over (0/90/180/270)
-          -  NEW: if scores tie, prefer 0-degree (do-nothing)
+          - SAFE fallback candidate selection (0/90/180/270) by quad detection quality
+          - KEY FIX: if best_score is only slightly better than 0deg (<= epsilon), keep 0deg
         """
         meta: Dict[str, Any] = {
             "enabled": bool(self.config.enable_orientation),
@@ -305,18 +297,13 @@ class DocUNetBackend(RectifyBackend):
 
         if not self.config.enable_orientation:
             meta["reason"] = "orientation disabled"
+            meta["correction_angle"] = 0
             return image_bgr, meta
 
         def _textline_score(img_bgr: np.ndarray) -> float:
-            """
-            OCR 없이 '가로 글줄'이 더 뚜렷한 방향을 선호하기 위한 타이브레이커 점수.
-            - row projection variance / col projection variance 비율을 사용
-            - 값이 클수록 '가로 줄 구조(=정방향일 가능성)'가 강함
-            """
+            """OCR 없이 '가로 글줄 구조'를 선호하는 보조 점수."""
             try:
                 gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-
-                # 너무 큰 이미지는 간단히 축소해서 빠르게 평가
                 h, w = gray.shape[:2]
                 max_side = 900
                 m = max(h, w)
@@ -324,383 +311,201 @@ class DocUNetBackend(RectifyBackend):
                     r = max_side / float(m)
                     gray = cv2.resize(gray, (int(w * r), int(h * r)), interpolation=cv2.INTER_AREA)
 
-                # 텍스트/획 강조를 위해 edge 기반으로 가볍게
                 gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
                 gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
                 mag = cv2.magnitude(gx, gy)
 
-                # row/col projection
                 row = np.sum(mag, axis=1)
                 col = np.sum(mag, axis=0)
 
                 vr = float(np.var(row))
                 vc = float(np.var(col))
-
-                # ratio (가로 줄 구조가 강하면 vr이 더 커지는 경향)
                 return (vr + 1e-6) / (vc + 1e-6)
             except Exception:
                 return 0.0
 
-        # --- helper: score a rotated image by document quad detection quality ---
         def score_rotation(img: np.ndarray) -> Tuple[float, Dict[str, Any]]:
             quad, find_meta = find_document_quad(img, self.config.params)
             if quad is None:
                 return 0.0, {"found": False, "find": find_meta}
 
             best_area = float(find_meta.get("best_area", 0.0))
-
-            #  NEW: 타이브레이커 점수(가로 글줄 구조)
             tls = float(_textline_score(img))
 
-            # 가중치는 'best_area 차이'보다 훨씬 작게(동점일 때만 영향) 주는 게 안전
-            # best_area는 대략 2e5 단위라서, tls는 보통 0.5~2.0 근처
-            # => 1e5 정도 곱해주면 동점에서 안정적으로 갈라짐
+            # 안정성: best_area가 주도하고, tls는 동점 근처에서만 영향
             alpha = 1e5
             score = 1e9 + best_area + (alpha * tls)
 
             return score, {"found": True, "find": find_meta, "textline_score": tls}
 
-        # ---------- build candidates ----------
-        # Always include 0deg first (safety + "normal이면 0도 유지" 목적)
-        candidates = [(0, "keep_0deg")]
+        # ---- doctr prediction (optional) ----
+        pred_angle: Optional[int] = None
+        pred_conf: Optional[float] = None
+        doctr_correction: Optional[int] = None
+        uncertain: bool = False
 
-        pred_conf = None
-        doctr_correction = None
-
-        # predictor가 있으면: 기존처럼 doctr 기반 후보를 앞쪽에 추가
         if self._orientation_predictor is not None:
             try:
                 rgb = self._bgr_to_rgb(image_bgr)
                 pred_out = self._orientation_predictor([rgb])
 
-                # NOTE: 아래 파싱 로직은 기존 파일의 방식/키에 맞춰 유지해야 함
-                #       (현재 파일에서 pred_out 파싱하는 코드가 이어져 있을 텐데,
-                #        그 구조를 깨지 않기 위해 "기존 파싱부"는 그대로 두는 걸 권장)
-                # 여기서는 "이미 파일에 있던 pred_out 파싱부"를 그대로 사용한다는 가정으로
-                # pred_angle, pred_conf를 얻었다고 보고, doctr_correction 후보만 계산한다.
-
-                # --------------------------
-                # [중요] 기존 코드의 pred_out 파싱부 START/END를 그대로 유지해서
-                # pred_angle / pred_conf 값을 세팅해줘야 해.
-                # --------------------------
-                # 예시(파일마다 다를 수 있음):
-                # pred_angle = int(...)
-                # pred_conf = float(...)
-                # --------------------------
-                # [중요] 기존 pred_out 파싱부를 여기에 "그대로" 두는 걸 추천.
-                # --------------------------
-
-                # doctr가 "현재가 rotated"라고 예측했을 때, 우리가 적용할 correction 각도 계산
-                # (기존 코드의 계산을 그대로 쓰는 게 안전)
-                # 예: pred_angle in {0,90,180,270} 라면 correction은 (-pred_angle) mod 360
+                meta["raw_output_type"] = type(pred_out).__name__
                 try:
-                    pred_angle = meta.get("pred_angle", None)
-                    if pred_angle is None:
-                        # 기존 파싱부에서 pred_angle을 지역변수로 썼다면, 그 변수를 그대로 쓰면 됨
-                        pred_angle = None
+                    meta["raw_output_preview"] = str(pred_out)[:500]
                 except Exception:
-                    pred_angle = None
+                    meta["raw_output_preview"] = "<unserializable>"
+
+                pred_angle = self._angle_from_doctr_output(pred_out)
+                pred_conf = self._confidence_from_doctr_output(pred_out)
+
+                meta["angle"] = pred_angle
+                meta["confidence"] = pred_conf
+
+                if pred_angle is None:
+                    uncertain = True
+                    meta["uncertain_reason"] = "angle_parse_failed"
+                elif pred_conf is not None and pred_conf < float(self.config.min_orientation_confidence):
+                    uncertain = True
+                    meta["uncertain_reason"] = f"low_confidence<{self.config.min_orientation_confidence}"
 
                 if pred_angle in (0, 90, 180, 270):
+                    # predictor는 "현재 방향"이라고 해석 -> inverse rotation이 correction
                     doctr_correction = int((-int(pred_angle)) % 360)
 
             except Exception as e:
-                # predictor가 "있긴 한데" 실행 실패 -> fallback으로 전환
+                # predictor가 "있지만" 실패 -> fallback
                 meta["predictor_error"] = repr(e)
                 meta["predictor_available"] = False
+                pred_angle = None
                 pred_conf = None
                 doctr_correction = None
+                uncertain = True
 
-        # predictor가 없거나(또는 실패)라도: SAFE fallback 후보 테스트를 하도록 한다.
-        # doctr_correction이 유효하면 0도 다음에 우선 배치(단, 중복 제거)
+        # ---- build candidates (always include 0 first) ----
+        candidates: List[Tuple[int, str]] = [(0, "keep_0deg")]
+
+        # doctr correction 후보를 0 다음에 우선 넣되, 중복 제거
         if doctr_correction in (0, 90, 180, 270) and doctr_correction != 0:
-            candidates.append((doctr_correction, "doctr_inverse"))
+            candidates.append((int(doctr_correction), "doctr_inverse"))
 
-        # 나머지 후보(0/90/180/270) 채우기 (중복 제거)
+        # 나머지 90/180/270 채우기
         for ang in (90, 180, 270):
             if all(c[0] != ang for c in candidates):
                 candidates.append((ang, f"rot{ang}"))
 
-        # ---------- SAFE fallback scoring ----------
-        try:
-            scored = []
-            best_score = -1.0
-            best_ang = 0
-            best_tag = "keep_0deg"
-            best_detail: Dict[str, Any] = {}
+        # ---- score candidates safely ----
+        scored: List[Dict[str, Any]] = []
+        best_score = -1.0
+        best_ang = 0
+        best_tag = "keep_0deg"
+        best_detail: Dict[str, Any] = {}
+        all_failed = True
 
-            all_failed = True
-            for ang, tag in candidates:
-                rotated_try = self._apply_rotation_bgr(image_bgr, int(ang))
-                s, detail = score_rotation(rotated_try)
-                found = bool(detail.get("found", False))
-                if found:
-                    all_failed = False
+        score0: float = 0.0
+        found0: bool = False
 
-                scored.append(
-                    {
-                        "angle": int(ang),
-                        "tag": tag,
-                        "score": float(s),
-                        "found": found,
-                        "best_area": float(detail.get("find", {}).get("best_area", 0.0)),
-                        "textline_score": float(detail.get("textline_score", 0.0)),
+        for ang, tag in candidates:
+            rotated_try = self._apply_rotation_bgr(image_bgr, int(ang))
+            s, detail = score_rotation(rotated_try)
+            found = bool(detail.get("found", False))
+            if found:
+                all_failed = False
 
+            row = {
+                "angle": int(ang),
+                "tag": tag,
+                "score": float(s),
+                "found": found,
+                "best_area": float(detail.get("find", {}).get("best_area", 0.0)),
+                "textline_score": float(detail.get("textline_score", 0.0)),
+            }
+            scored.append(row)
+
+            if int(ang) == 0:
+                score0 = float(s)
+                found0 = found
+
+            # 기본 best 선택 (동점이면 0도 우선)
+            if (s > best_score) or (s == best_score and int(ang) == 0 and best_ang != 0):
+                best_score = float(s)
+                best_ang = int(ang)
+                best_tag = tag
+                best_detail = detail
+
+        # SAFETY: 모두 실패면 회전하지 않음
+        if all_failed or best_score <= 0.0:
+            meta["fallback"] = {
+                "applied": False,
+                "chosen": {"angle": 0, "tag": "no_rotation_all_candidates_failed"},
+                "candidates": candidates,
+                "scored": scored,
+                "scoring": {"all_failed": True},
+            }
+            meta["correction_angle"] = 0
+            meta["applied"] = False
+            meta["reason"] = (
+                "fallback_disabled_all_candidates_failed"
+                if meta.get("predictor_available", False)
+                else "fallback_disabled_all_candidates_failed_no_predictor"
+            )
+            return image_bgr, meta
+
+        # 핵심 FIX: best가 0보다 "근소하게" 좋으면 0 유지
+        # (특히 predictor 없을 때 0/180이 사실상 동일한데 area 1~수 픽셀 차이로 180 선택되는 문제 방지)
+        if found0:
+            epsilon = float(self.config.prefer_keep0_when_close_score_epsilon)
+            if (best_ang != 0) and ((best_score - score0) <= epsilon):
+                best_ang = 0
+                best_tag = "keep_0deg_close_score"
+                best_detail = {"keep0_epsilon": epsilon, "best_minus_0": float(best_score - score0)}
+
+        # 선택적: 0deg vs doctr_inverse 면적이 거의 같으면 doctr 우선 (옵션 켰을 때만)
+        if (
+            bool(self.config.prefer_doctr_when_tie)
+            and (doctr_correction is not None)
+            and (pred_conf is not None)
+            and (pred_conf >= float(self.config.min_orientation_confidence))
+        ):
+            areas = {r["angle"]: float(r.get("best_area", 0.0)) for r in scored if r.get("found", False)}
+            if 0 in areas and int(doctr_correction) in areas:
+                a0 = areas[0]
+                ad = areas[int(doctr_correction)]
+                denom = max(a0, ad, 1e-6)
+                rel_diff = abs(a0 - ad) / denom
+                if rel_diff <= float(self.config.tie_area_ratio):
+                    best_ang = int(doctr_correction)
+                    best_tag = "doctr_inverse_tie_break"
+                    best_detail = {
+                        "tie_break": {
+                            "rel_diff": rel_diff,
+                            "area_0deg": a0,
+                            "area_doctr_inverse": ad,
+                            "tie_area_ratio": float(self.config.tie_area_ratio),
+                        }
                     }
-                )
 
-                #  NEW: 점수가 같으면 0도(무회전) 우선
-                if (s > best_score) or (s == best_score and int(ang) == 0 and best_ang != 0):
-                    best_score = float(s)
-                    best_ang = int(ang)
-                    best_tag = tag
-                    best_detail = detail
+        rotated = self._apply_rotation_bgr(image_bgr, best_ang)
 
-            #  SAFETY RULE: if all candidates fail to find quad -> DO NOT ROTATE
-            if all_failed or best_score <= 0.0:
-                meta["fallback"] = {
-                    "applied": False,
-                    "chosen": {"angle": 0, "tag": "no_rotation_all_candidates_failed"},
-                    "candidates": candidates,
-                    "scored": scored,
-                    "scoring": {"all_failed": True},
-                }
-                meta["correction_angle"] = 0
-                meta["applied"] = False
-                # predictor 유무에 따라 reason을 더 명확히
-                meta["reason"] = (
-                    "fallback_disabled_all_candidates_failed"
-                    if meta.get("predictor_available", False)
-                    else "fallback_disabled_all_candidates_failed_no_predictor"
-                )
-                return image_bgr, meta
+        meta["fallback"] = {
+            "applied": bool(best_ang != 0),
+            "chosen": {"angle": best_ang, "tag": best_tag},
+            "candidates": candidates,
+            "scored": scored,
+            "scoring": best_detail,
+        }
+        meta["correction_angle"] = best_ang
+        meta["applied"] = bool(best_ang != 0)
 
-            #  TIE-BREAK(기존 유지): 0deg vs doctr_inverse 거의 비슷하면 doctr_inverse 우선 (옵션 켰을 때만)
-            if (
-                    bool(self.config.prefer_doctr_when_tie)
-                    and (doctr_correction is not None)
-                    and (pred_conf is not None)
-                    and (pred_conf >= self.config.min_orientation_confidence)
-            ):
-                areas = {s["angle"]: float(s.get("best_area", 0.0)) for s in scored if s.get("found", False)}
-                if 0 in areas and doctr_correction in areas:
-                    a0 = areas[0]
-                    ad = areas[doctr_correction]
-                    denom = max(a0, ad, 1e-6)
-                    rel_diff = abs(a0 - ad) / denom
-
-                    if rel_diff <= float(self.config.tie_area_ratio):
-                        best_ang = int(doctr_correction)
-                        best_tag = "doctr_inverse_tie_break"
-                        best_detail = {
-                            "tie_break": {
-                                "rel_diff": rel_diff,
-                                "area_0deg": a0,
-                                "area_doctr_inverse": ad,
-                                "tie_area_ratio": float(self.config.tie_area_ratio),
-                            }
-                        }
-
-            # apply best rotation
-            rotated = self._apply_rotation_bgr(image_bgr, best_ang)
-            meta["fallback"] = {
-                "applied": best_ang != 0,
-                "chosen": {"angle": best_ang, "tag": best_tag},
-                "candidates": candidates,
-                "scored": scored,
-                "scoring": best_detail,
-            }
-            meta["correction_angle"] = best_ang
-            meta["applied"] = (best_ang != 0)
-
-            # predictor 유무에 따라 reason 구분
-            if meta.get("predictor_available", False):
-                meta["reason"] = "used_fallback_candidate_selection_safe"
+        # reason 문자열은 기존 meta 스타일을 유지
+        if meta.get("predictor_available", False):
+            if pred_angle is not None and not uncertain and pred_conf is not None and pred_conf >= float(self.config.min_orientation_confidence):
+                meta["reason"] = "used_fallback_candidate_selection_safe"  # (기존과 동일 톤 유지)
             else:
-                meta["reason"] = "used_fallback_candidate_selection_safe_no_predictor"
+                meta["reason"] = "doctr_uncertain -> fallback_candidate_selection"
+        else:
+            meta["reason"] = "used_fallback_candidate_selection_safe_no_predictor"
 
-            return rotated, meta
-
-        except Exception as e:
-            meta["error"] = repr(e)
-            meta["reason"] = "orientation inference failed"
-            return image_bgr, meta
-
-            rotated = self._apply_rotation_bgr(image_bgr, best_ang)
-            fallback = {
-                "applied": bool(best_ang != 0),
-                "chosen": {"angle": best_ang, "tag": best_tag},
-                "candidates": candidates,
-                "scored": scored,
-                "scoring": best_detail,
-            }
-            return rotated, fallback
-
-        #  candidates: always test all 4 angles (policy: 정상은 0도 유지)
-        base_candidates: List[Tuple[int, str]] = [
-            (0, "no_rotation"),
-            (90, "cand_90"),
-            (180, "cand_180"),
-            (270, "cand_270"),
-        ]
-
-        # ------------------------------------------------------------
-        # CASE A) predictor unavailable -> run fallback candidate selection
-        # ------------------------------------------------------------
-        if self._orientation_predictor is None:
-            meta["reason"] = "orientation predictor unavailable -> fallback_candidate_selection"
-            rotated, fb = choose_best_candidate(base_candidates, prefer_zero_on_tie=True)
-            meta["fallback"] = fb
-            chosen = fb.get("chosen", {}).get("angle", 0)
-            meta["correction_angle"] = int(chosen) if chosen in (0, 90, 180, 270) else 0
-            meta["applied"] = bool(meta["correction_angle"] != 0)
-            return rotated, meta
-
-        # ------------------------------------------------------------
-        # CASE B) predictor available -> try doctr, else fallback if uncertain
-        # ------------------------------------------------------------
-        try:
-            rgb = self._bgr_to_rgb(image_bgr)
-            pred_out = self._orientation_predictor([rgb])
-
-            meta["raw_output_type"] = type(pred_out).__name__
-            try:
-                meta["raw_output_preview"] = str(pred_out)[:500]
-            except Exception:
-                meta["raw_output_preview"] = "<unserializable>"
-
-            pred_angle = self._angle_from_doctr_output(pred_out)  # 0/90/180/270 or None
-            pred_conf = self._confidence_from_doctr_output(pred_out)  # float or None
-
-            meta["angle"] = pred_angle
-            meta["confidence"] = pred_conf
-
-            uncertain = False
-            if pred_angle is None:
-                uncertain = True
-                meta["uncertain_reason"] = "angle_parse_failed"
-            elif pred_conf is not None and pred_conf < float(self.config.min_orientation_confidence):
-                uncertain = True
-                meta["uncertain_reason"] = f"low_confidence<{self.config.min_orientation_confidence}"
-
-            # confident doctr path
-            if (not uncertain) and pred_angle in (0, 90, 180, 270):
-                correction = (-int(pred_angle)) % 360
-                rotated = self._apply_rotation_bgr(image_bgr, correction)
-                meta["correction_angle"] = correction
-                meta["applied"] = (correction != 0)
-                meta["reason"] = "used_doctr_inverse_confident"
-                return rotated, meta
-
-            # uncertain -> fallback candidate selection (still prefer 0 on tie)
-            meta["reason"] = "doctr_uncertain -> fallback_candidate_selection"
-            rotated, fb = choose_best_candidate(base_candidates, prefer_zero_on_tie=True)
-            meta["fallback"] = fb
-            chosen = fb.get("chosen", {}).get("angle", 0)
-            meta["correction_angle"] = int(chosen) if chosen in (0, 90, 180, 270) else 0
-            meta["applied"] = bool(meta["correction_angle"] != 0)
-            return rotated, meta
-
-        except Exception as e:
-            meta["error"] = repr(e)
-            meta["reason"] = "orientation inference failed -> fallback_candidate_selection"
-            rotated, fb = choose_best_candidate(base_candidates, prefer_zero_on_tie=True)
-            meta["fallback"] = fb
-            chosen = fb.get("chosen", {}).get("angle", 0)
-            meta["correction_angle"] = int(chosen) if chosen in (0, 90, 180, 270) else 0
-            meta["applied"] = bool(meta["correction_angle"] != 0)
-            return rotated, meta
-
-            # 5) score candidates
-            best_score = -1.0
-            best_ang = 0
-            best_tag = "no_rotation"
-            best_detail: Dict[str, Any] = {}
-
-            all_failed = True
-            scored: List[Dict[str, Any]] = []
-
-            for ang, tag in candidates:
-                rotated = self._apply_rotation_bgr(image_bgr, ang)
-                s, detail = score_rotation(rotated)
-
-                found = bool(detail.get("found", False))
-                if found:
-                    all_failed = False
-
-                scored.append({
-                    "angle": ang,
-                    "tag": tag,
-                    "score": s,
-                    "found": found,
-                    "best_area": float(detail.get("find", {}).get("best_area", 0.0)),
-                })
-
-                if s > best_score:
-                    best_score = s
-                    best_ang = ang
-                    best_tag = tag
-                    best_detail = detail
-
-            #  SAFETY RULE: if all candidates fail to find quad -> DO NOT ROTATE
-            if all_failed or best_score <= 0.0:
-                meta["fallback"] = {
-                    "applied": False,
-                    "chosen": {"angle": 0, "tag": "no_rotation_all_candidates_failed"},
-                    "candidates": candidates,
-                    "scored": scored,
-                    "scoring": {"all_failed": True},
-                }
-                meta["correction_angle"] = 0
-                meta["applied"] = False
-                meta["reason"] = "fallback_disabled_all_candidates_failed"
-                return image_bgr, meta
-
-            #  TIE-BREAK: if 0deg and doctr_inverse are both found and areas are nearly equal, prefer doctr_inverse
-            if (
-                    bool(self.config.prefer_doctr_when_tie)
-                    and (doctr_correction is not None)
-                    and (pred_conf is not None)
-                    and (pred_conf >= self.config.min_orientation_confidence)
-            ):
-                areas = {s["angle"]: float(s.get("best_area", 0.0)) for s in scored if s.get("found", False)}
-                if 0 in areas and doctr_correction in areas:
-                    a0 = areas[0]
-                    ad = areas[doctr_correction]
-                    denom = max(a0, ad, 1e-6)
-                    rel_diff = abs(a0 - ad) / denom
-
-                    # if difference within tie ratio, trust doctr prior
-                    if rel_diff <= float(self.config.tie_area_ratio):
-                        best_ang = doctr_correction
-                        best_tag = "doctr_inverse_tie_break"
-                        best_detail = {
-                            "tie_break": {
-                                "rel_diff": rel_diff,
-                                "area_0deg": a0,
-                                "area_doctr_inverse": ad,
-                                "tie_area_ratio": float(self.config.tie_area_ratio),
-                            }
-                        }
-
-            # apply best rotation
-            rotated = self._apply_rotation_bgr(image_bgr, best_ang)
-            meta["fallback"] = {
-                "applied": best_ang != 0,
-                "chosen": {"angle": best_ang, "tag": best_tag},
-                "candidates": candidates,
-                "scored": scored,
-                "scoring": best_detail,
-            }
-            meta["correction_angle"] = best_ang
-            meta["applied"] = (best_ang != 0)
-            meta["reason"] = "used_fallback_candidate_selection_safe"
-            return rotated, meta
-
-        except Exception as e:
-            meta["error"] = repr(e)
-            meta["reason"] = "orientation inference failed"
-            return image_bgr, meta
+        return rotated, meta
 
     # -------------------------
     # public

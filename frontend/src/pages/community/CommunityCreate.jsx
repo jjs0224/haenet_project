@@ -4,40 +4,37 @@ import { CommunityContext } from "../../context/CommunityContext";
 import CreateModal from "../../components/community/CreateModal";
 import { ReviewContext } from "../../context/ReviewContext";
 
-
 export default function CommunityCreate() {
   const nav = useNavigate();
   const { communityActions } = useContext(CommunityContext);
   const { stateReview, reviewActions } = useContext(ReviewContext);
 
   const [isOpen, setIsOpen] = useState(false);
-  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
   const handleConfirm = async ({ templateId, reviewIds }) => {
-    setError("");
     setSaving(true);
     const payload = {
       template_id: templateId,
       review_ids: reviewIds,
     }
 
-    console.log("community create payload:", payload);
 
     try {
-      const created = await communityActions.create(payload);
-      console.log("[CommunityCreate] create response:", created);
+      await communityActions.create(payload);
+      // console.log("[CommunityCreate] create response:", created);
 
 
       setIsOpen(false);     // 모달 닫기
       nav("/community");    // 커뮤니티 목록으로 이동
     } catch (e) {
-      setError(e.message || "Generate AI image failed");
+      alert(e.message || "Generate AI image failed");
     } finally {
       setSaving(false);
     }
   };
 
+  
   return (
     <div style={{ padding: 16, maxWidth: 720 }}>
       <h2>New Community Post</h2>

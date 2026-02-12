@@ -1,11 +1,11 @@
-/* ===== Review Create Container ===== */
+/* ===== Review Create Container - Mobile Optimized (430px) ===== */
 .reviewCreateContainer {
   position: relative;
-  max-width: 420px;
+  max-width: 430px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 16px;
   background: #FFFFFF;
-  border-radius: 16px;
+  border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
   min-height: calc(100vh - 106px);
@@ -47,80 +47,80 @@
 
 .loadingText {
   color: #2E7D32;
-  font-size: 1.1rem;
+  font-size: 14px;
   font-weight: 600;
   margin: 0;
 }
 
 .reviewCreateTitle {
-  font-size: 28px;
+  font-size: 20px;
   font-weight: 700;
-  color: #333333; /* 다크 그레이 */
-  margin: 0 0 32px 0;
+  color: #333333;
+  margin: 0 0 20px 0;
   text-align: center;
 }
 
 /* ===== Step Section ===== */
 .stepSection {
-  margin-bottom: 32px;
-  padding: 24px;
-  background: #F5F5F5; /* 아주 연한 웜그레이 */
-  border-radius: 12px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #F5F5F5;
+  border-radius: 10px;
 }
 
 .stepHeader {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 600;
-  color: #333333; /* 다크 그레이 */
-  margin-bottom: 16px;
+  color: #333333;
+  margin-bottom: 12px;
 }
 
 /* ===== Receipt Upload ===== */
 .receiptUpload {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
 }
 
 .fileInput {
   flex: 1;
-  padding: 10px;
+  padding: 8px;
   border: 2px solid #DDDDDD;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 6px;
+  font-size: 12px;
   background: #FFFFFF;
   color: #333333;
 }
 
 /* ===== Receipt Preview ===== */
 .receiptPreview {
-  margin-top: 12px;
+  margin-top: 10px;
   text-align: center;
 }
 
 .receiptPreviewImage {
   max-width: 100%;
-  max-height: 300px;
+  max-height: 240px;
   object-fit: contain;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 2px solid #DDDDDD;
 }
 
 /* ===== Buttons ===== */
 .btnPrimary {
-  padding: 10px 24px;
-  background: #2E7D32; /* 딥 그린 */
+  padding: 8px 18px;
+  background: #2E7D32;
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 6px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btnPrimary:hover {
-  background: #1B5E20; /* 더 진한 그린 */
+  background: #1B5E20;
   transform: translateY(-2px);
 }
 
@@ -135,29 +135,29 @@
 .menuConfirmSection {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
 }
 
 .menuConfirmText {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 500;
-  color: #333333; /* 다크 그레이 */
+  color: #333333;
   margin: 0;
 }
 
 .menuList {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .menuItem {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
+  padding: 8px 12px;
   background: #FFFFFF;
-  border-radius: 10px;
+  border-radius: 8px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   transition: all 0.2s;
 }
@@ -165,29 +165,29 @@
 .menuItem:hover {
   transform: translateX(4px);
   box-shadow: 0 4px 10px rgba(46, 125, 50, 0.15);
-  border-left: 3px solid #81C784; /* 라이트 그린 */
+  border-left: 3px solid #81C784;
 }
 
 .menuIcon {
-  font-size: 24px;
+  font-size: 20px;
 }
 
 .menuName {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  color: #333333; /* 다크 그레이 */
+  color: #333333;
   flex: 1;
 }
 
 /* 메뉴 X 삭제 버튼 */
 .btnRemoveMenu {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   border: none;
   background: #E53935;
   color: #FFFFFF;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1;
   display: flex;
@@ -208,42 +208,42 @@
 /* ===== Menu Confirm Buttons ===== */
 .menuConfirmButtons {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   justify-content: center;
 }
 
 .btnConfirm {
-  padding: 12px 32px;
-  background: #2E7D32; /* 딥 그린 */
+  padding: 10px 24px;
+  background: #2E7D32;
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: 6px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btnConfirm:hover {
-  background: #1B5E20; /* 더 진한 그린 */
+  background: #1B5E20;
   transform: translateY(-2px);
   box-shadow: 0 2px 8px rgba(46, 125, 50, 0.3);
 }
 
 .btnCancel {
-  padding: 12px 32px;
+  padding: 10px 24px;
   background: #FFFFFF;
-  color: #D32F2F; /* 레드 */
+  color: #D32F2F;
   border: 1px solid #D32F2F;
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: 6px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btnCancel:hover {
-  background: #D32F2F; /* 레드 */
+  background: #D32F2F;
   color: white;
   transform: translateY(-2px);
   box-shadow: 0 2px 8px rgba(211, 47, 47, 0.3);
@@ -253,40 +253,40 @@
 .reviewForm {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
 }
 
 .formGroup {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .formLabel {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: #333333; /* 다크 그레이 */
+  color: #333333;
 }
 
 .formInput {
-  padding: 12px 16px;
+  padding: 10px 12px;
   border: 2px solid #DDDDDD;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 6px;
+  font-size: 13px;
   transition: border-color 0.2s;
   color: #333333;
 }
 
 .formInput:focus {
   outline: none;
-  border-color: #2E7D32; /* 딥 그린 */
+  border-color: #2E7D32;
 }
 
 .formTextarea {
-  padding: 12px 16px;
+  padding: 10px 12px;
   border: 2px solid #DDDDDD;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 6px;
+  font-size: 13px;
   resize: vertical;
   font-family: inherit;
   transition: border-color 0.2s;
@@ -295,24 +295,24 @@
 
 .formTextarea:focus {
   outline: none;
-  border-color: #2E7D32; /* 딥 그린 */
+  border-color: #2E7D32;
 }
 
 /* ===== Rating Select ===== */
 .ratingSelect {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .star {
-  font-size: 32px;
+  font-size: 28px;
   color: #DDDDDD;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .star.active {
-  color: #FFC107; /* 노란 별 */
+  color: #FFC107;
 }
 
 .star:hover {
@@ -321,15 +321,15 @@
 
 /* ===== Image Upload ===== */
 .imageCount {
-  font-size: 12px;
-  color: #666666; /* 미디엄 그레이 */
-  margin-top: 8px;
+  font-size: 11px;
+  color: #666666;
+  margin-top: 6px;
 }
 
 .imagePreviewList {
   display: flex;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 10px;
+  margin-top: 10px;
   flex-wrap: wrap;
 }
 
@@ -338,24 +338,24 @@
 }
 
 .previewImage {
-  width: 110px;
-  height: 110px;
+  width: 90px;
+  height: 90px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 2px solid #DDDDDD;
 }
 
 .btnRemoveImage {
   position: absolute;
-  top: -8px;
-  right: -8px;
-  width: 28px;
-  height: 28px;
+  top: -6px;
+  right: -6px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: 2px solid #D32F2F; /* 레드 */
+  border: 2px solid #D32F2F;
   background: white;
   color: #D32F2F;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
   display: flex;
@@ -372,20 +372,20 @@
 
 /* ===== Submit Button ===== */
 .btnSubmit {
-  padding: 14px 32px;
-  background: #2E7D32; /* 딥 그린 */
+  padding: 12px 24px;
+  background: #2E7D32;
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: 6px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .btnSubmit:hover {
-  background: #1B5E20; /* 더 진한 그린 */
+  background: #1B5E20;
   transform: translateY(-2px);
   box-shadow: 0 2px 8px rgba(46, 125, 50, 0.3);
 }
@@ -399,21 +399,21 @@
 
 /* ===== Messages ===== */
 .message {
-  padding: 12px 16px;
-  border-radius: 8px;
-  margin-top: 16px;
-  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  margin-top: 12px;
+  font-size: 12px;
   font-weight: 500;
 }
 
 .message.success {
-  background: #E8F5E9; /* 연한 그린 배경 */
-  color: #2E7D32; /* 딥 그린 텍스트 */
-  border: 1px solid #81C784; /* 라이트 그린 */
+  background: #E8F5E9;
+  color: #2E7D32;
+  border: 1px solid #81C784;
 }
 
 .message.error {
-  background: #FFEBEE; /* 연한 레드 배경 */
-  color: #D32F2F; /* 레드 텍스트 */
+  background: #FFEBEE;
+  color: #D32F2F;
   border: 1px solid #EF5350;
 }

@@ -32,17 +32,11 @@ export default function RestrictionsAdminContainer() {
   const [data, setData] = useState([]);
   const [q, setQ] = useState("");
 
-  //  디버그용 raw 저장
-  const [raw, setRaw] = useState(null);
-
   const loadAll = async () => {
     setMsg("");
     setLoading(true);
     try {
       const res = await RestrictionsAdminAPI.list({ onlyActive: false });
-
-      //  디버그: 원본 payload 저장
-      setRaw(res?.data ?? res);
 
       const list = normalizeRestrictions(res);
       setData(list);
@@ -54,7 +48,6 @@ export default function RestrictionsAdminContainer() {
     } catch (e) {
       setMsg(`❌ ${e?.response?.data?.detail || e?.message || "조회 실패"}`);
       setData([]);
-      setRaw(e?.response?.data ?? null);
       console.error("[ADMIN] list error:", e?.response?.data || e);
     } finally {
       setLoading(false);
@@ -119,6 +112,24 @@ export default function RestrictionsAdminContainer() {
     }
   };
 
+  const addItemToCategory = async (category_id, payload) => {
+    setMsg("");
+    try {
+      await RestrictionsAdminAPI.addItemToCategory(category_id, {
+        item_label_ko: payload.item_label_ko,
+        item_label_en: payload.item_label_en,
+        item_active: true,
+      });
+
+      if (metaActions?.refresh) await metaActions.refresh({ force: true });
+
+      await loadAll();
+      setMsg(` 아이템 추가 완료 (Category #${category_id})`);
+    } catch (e) {
+      setMsg(`❌ ${e?.response?.data?.detail || e?.message || "아이템 추가 실패"}`);
+    }
+  };
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return data;
@@ -173,6 +184,7 @@ export default function RestrictionsAdminContainer() {
           onChangeItem={updateItemLocal}
           onSaveCategory={saveCategory}
           onSaveItem={saveItem}
+          onAddItem={addItemToCategory}
         />
       </div>
     </div>

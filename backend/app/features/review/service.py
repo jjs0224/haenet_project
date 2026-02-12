@@ -10,6 +10,34 @@ from sqlalchemy import select, update
 from backend.app.core import config
 from backend.app.common.utils.debug import log_exception
 from backend.app.common.utils.util import ensure_list, dumps_json, parse_ids
+
+def parse_menu_name(menu_name_raw: Optional[str]) -> List[str]:
+    """
+    menu_name 문자열을 파싱하여 리스트로 반환
+    - None/빈 문자열 -> []
+    - JSON 배열 문자열 -> 파싱된 리스트
+    - 일반 문자열 -> [문자열]
+    """
+    if not menu_name_raw:
+        return []
+
+    menu_name_raw = menu_name_raw.strip()
+
+    # JSON 배열 문자열인 경우
+    if menu_name_raw.startswith('[') and menu_name_raw.endswith(']'):
+        try:
+            parsed = json.loads(menu_name_raw)
+            if isinstance(parsed, list):
+                return [str(item).strip() for item in parsed if item]
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # 쉼표로 구분된 문자열
+    if ',' in menu_name_raw:
+        return [item.strip() for item in menu_name_raw.split(',') if item.strip()]
+
+    # 단일 문자열
+    return [menu_name_raw]
 from backend.app.common.service.file_upload_service import (
     build_temp_prefix,
     ensure_local_path,
@@ -274,7 +302,7 @@ def list_reviews(db: Session, *, member_id: Optional[int] = None) -> List[
             "rating": r.rating,
             "location": r.location,
             "available": r.available,
-            "menu_name": [r.menu_name] if r.menu_name else [],
+            "menu_name": parse_menu_name(r.menu_name),
             "review_items": parse_ids(r.review_items),
             # 프론트가 created_at/updated_at 키를 기대해서 맞춰줌
             "created_at": r.create_at.isoformat() if getattr(r, "create_at", None) else None,
@@ -317,10 +345,7 @@ def get_review_detail(db: Session, review_id: int) -> Dict[str, Any]:
         "rating": r.rating,
         "location": r.location,
         "available": r.available,
-        # "menu_name": r.menu_name,
-        "menu_name": [r.menu_name] if r.menu_name else [],
-        # "menu_name": _parse_csv_ids(r.menu_name),
-        # "menu_names": [r.menu_name] if r.menu_name else [],
+        "menu_name": parse_menu_name(r.menu_name),
         "review_items": parse_ids(r.review_items),
         "created_at": r.create_at.isoformat() if getattr(r, "create_at", None) else None,
         "updated_at": r.update_at.isoformat() if getattr(r, "update_at", None) else None,
@@ -422,8 +447,7 @@ def list_reviews_by_ids(
             "rating": r.rating,
             "location": r.location,
             "available": r.available,
-            # 기존 코드 유지 (menu_name이 문자열이면 [문자열], 없으면 [])
-            "menu_name": [r.menu_name] if r.menu_name else [],
+            "menu_name": parse_menu_name(r.menu_name),
             "review_items": parse_ids(r.review_items),
             "created_at": r.create_at.isoformat() if getattr(r, "create_at", None) else None,
             "updated_at": r.update_at.isoformat() if getattr(r, "update_at", None) else None,

@@ -9,21 +9,21 @@
   z-index: 9999;
   /* 모달이 뷰포트보다 클 때 백드롭 자체가 스크롤 가능 */
   overflow-y: auto;
-  padding: 40px 0;
+  padding: 20px 0;
   box-sizing: border-box;
 }
 
 .modal {
   position: relative;
   background: #fff;
-  padding: 20px;
+  padding: 16px;
   border-radius: 10px;
-  min-width: 320px;
-  max-width: 720px;
+  min-width: 300px;
+  max-width: 430px;
   width: 90%;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 3px 16px rgba(0, 0, 0, 0.15);
   /* 모달 자체도 최대 높이 제한 + 내부 스크롤 */
-  max-height: calc(100vh - 80px);
+  max-height: calc(100vh - 40px);
   overflow-y: auto;
   margin: 0 auto; /* 백드롭의 flex-start 아래에서 가운데 유지 */
   box-sizing: border-box;
@@ -33,23 +33,23 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .modalTitle {
   font-weight: 700;
-  font-size: 1.2rem;
+  font-size: 1.05rem;
 }
 
 .modalCloseBtn {
   background: none;
   border: none;
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   cursor: pointer;
   color: #666;
   padding: 0;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -62,19 +62,20 @@
 }
 
 .modalContent {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .modalActions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
 .modalActions button {
-  padding: 8px 16px;
-  border-radius: 4px;
+  padding: 8px 14px;
+  border-radius: 6px;
   cursor: pointer;
   transition: background-color 0.2s;
+  font-size: 13px;
 }

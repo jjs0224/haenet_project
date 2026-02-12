@@ -2,79 +2,46 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import chromadb
-from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 
 """
-retrieval.py
+EXACT-ONLY Retriever
 
-Design goals (current project policy):
-- RAG focuses on menu-name matching only.
-- CONFIRM (decide canonical menu) ONLY when EXACT match (including variants).
-- Otherwise return raw_menu (if provided) or None, and let downstream LLM handle refinement.
-- Chroma documents remain 'menu' only (A-plan). Variants are used as a lightweight post-filter
-  (max jamo similarity + exact-on-variant).
+Policy:
+- EXACT iff menu_norm matches chromadb.metadata["menu"] OR one of chromadb.metadata["variants"] (whitespace-normalized, csv/list)
+- No jamo / no rerank / no thresholds
+- Variants are treated as aliases that map to the canonical menu
 """
 
-# ==============================
-# CONFIG / ROUTING
-# ==============================
-COLLECTION_NAME = "menu_index"
-
-BASE_DIR = Path(__file__).resolve().parents[3]  # .../menu_assistant/
-DEFAULT_CHROMA_DIR = BASE_DIR / "data" / "chroma"
-DEFAULT_EMBED_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-
-# Runtime defaults (aligned to orchestrator/step_04 flags)
-DEFAULT_TOP_K = 5
-DEFAULT_SAVE_TOP_N = 2
-DEFAULT_SCORE_THRESHOLD = 0.55
-
-# Final score used for CLOSE vs NOT_FOUND gating (NOT for confirmation)
-DEFAULT_FINAL_W_EMBED = 0.65
-DEFAULT_FINAL_W_JAMO = 0.35
-DEFAULT_FINAL_CLOSE_THRESHOLD = 0.80
-
-# Hard cutoff requested previously: if best jamo < 0.5 => NOT_FOUND
-JAMO_HARD_CUTOFF = 0.5
-
-# Env overrides
+# --------- ENV routing (keep project conventions) ----------
 ENV_CHROMA_DIR = "MENU_ASSISTANT_CHROMA_DIR"
 ENV_CHROMA_S3_PREFIX = "MENU_ASSISTANT_CHROMA_S3_PREFIX"
 ENV_COLLECTION = "MENU_ASSISTANT_COLLECTION"
 ENV_EMBED_MODEL = "MENU_ASSISTANT_EMBED_MODEL"
 
+DEFAULT_COLLECTION = "menu_index"
+DEFAULT_EMBED_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+
 _WS_RE = re.compile(r"\s+")
 
 
-def _get_env_path(name: str) -> Optional[Path]:
-    v = os.environ.get(name)
-    if not v:
-        return None
-    try:
-        return Path(v).expanduser().resolve()
-    except Exception:
-        return Path(v)
-
-
-def _norm_space(s: str) -> str:
+def _norm_ws(s: str) -> str:
     s = (s or "").strip()
     return _WS_RE.sub(" ", s)
 
 
-def _split_csv(v: Any) -> List[str]:
-    """Best-effort CSV/list to list[str]."""
+def _split_csv_like(v: Any) -> List[str]:
     if v is None:
         return []
     if isinstance(v, (list, tuple, set)):
         out: List[str] = []
         for x in v:
-            xs = _norm_space(str(x))
+            xs = _norm_ws(str(x))
             if xs:
                 out.append(xs)
         return out
@@ -207,37 +174,36 @@ def jamo_similarity(a: str, b: str) -> float:
 # DATA STRUCTURES
 # ==============================
 @dataclass
-class Candidate:
-    id: str
-    embed_score: float
-    menu: str
-    ingredients_ko: List[str]
+class ConfirmedMenu:
+    menu_id: str
+    menu: str  # canonical
+    ingredients: List[str]
     alg_tags: List[str]
-    source: str = ""
-    variants: List[str] = field(default_factory=list)
-
-    # Scoring outputs
-    jamo_score: float = 0.0           # max jamo over [menu]+variants
-    best_variant: Optional[str] = None
-    final_score: float = 0.0          # w_embed*embed + w_jamo*jamo
+    # optional: if exact hit was through variants, store the matched alias
+    matched_variant: str = ""
+    # ✅ NEW: short Korean description (optional)
+    menu_description_ko: str = ""
 
 
-# ==============================
-# CHROMA RETRIEVER
-# ==============================
 class ChromaMenuRetriever:
     def __init__(
         self,
-        chroma_dir: Path = DEFAULT_CHROMA_DIR,
-        collection_name: str = COLLECTION_NAME,
-        embed_model: str = DEFAULT_EMBED_MODEL,
+        chroma_dir: Optional[Path] = None,
+        collection_name: Optional[str] = None,
+        embed_model: Optional[str] = None,
     ):
-        self.chroma_dir = _get_env_path(ENV_CHROMA_DIR) or Path(chroma_dir)
-        self.collection_name = os.environ.get(ENV_COLLECTION) or collection_name
-        self.embed_model = os.environ.get(ENV_EMBED_MODEL) or embed_model
+        chroma_env = os.environ.get(ENV_CHROMA_DIR)
+        self.chroma_dir = (
+            Path(chroma_env).expanduser().resolve()
+            if chroma_env
+            else (chroma_dir.expanduser().resolve() if chroma_dir else None)
+        )
 
-        self._collection = None
+        self.collection_name = os.environ.get(ENV_COLLECTION) or (collection_name or DEFAULT_COLLECTION)
+        self.embed_model = os.environ.get(ENV_EMBED_MODEL) or (embed_model or DEFAULT_EMBED_MODEL)
+
         self._client = None
+        self._collection = None
 
     def _init(self) -> None:
         if self._collection is not None:
@@ -251,277 +217,134 @@ class ChromaMenuRetriever:
             raise RuntimeError(f"[RAG] chroma_dir does not exist: {self.chroma_dir}")
 
         emb_fn = embedding_functions.SentenceTransformerEmbeddingFunction(model_name=self.embed_model)
-
-        if hasattr(chromadb, "PersistentClient"):
-            self._client = chromadb.PersistentClient(path=str(self.chroma_dir))
-        else:
-            # Legacy fallback
-            self._client = chromadb.Client(
-                Settings(persist_directory=str(self.chroma_dir), anonymized_telemetry=False)
-            )
-
+        self._client = chromadb.PersistentClient(path=str(self.chroma_dir))
         self._collection = self._client.get_or_create_collection(
             name=self.collection_name,
             embedding_function=emb_fn,
         )
 
-        # Empty collection check (fail fast)
+        # fail-fast if empty
         try:
-            cnt = self._collection.count()
+            if self._collection.count() == 0:
+                raise RuntimeError(
+                    f"[RAG] collection is empty. chroma_dir={self.chroma_dir} collection={self.collection_name}"
+                )
         except Exception:
             got = self._collection.get(limit=1, include=["metadatas"])
-            cnt = len(got.get("ids", []))
-        if cnt == 0:
-            raise RuntimeError(
-                f"[RAG] collection is empty. chroma_dir={self.chroma_dir} collection={self.collection_name}"
-            )
+            if not (got.get("ids") or []):
+                raise RuntimeError(
+                    f"[RAG] collection is empty. chroma_dir={self.chroma_dir} collection={self.collection_name}"
+                )
 
     @property
     def collection(self):
         self._init()
         return self._collection
 
-    def query(self, menu_norm: str, top_k: int) -> Tuple[str, List[Candidate], Dict[str, Any]]:
-        q = _norm_space(menu_norm)
+    def get_exact(self, menu_norm: str) -> Optional[ConfirmedMenu]:
+        q = _norm_ws(menu_norm)
         if not q:
-            return q, [], {"reason": "empty_query"}
+            return None
 
-        raw = self.collection.query(
-            query_texts=[q],
-            n_results=int(top_k),
-            include=["metadatas", "distances"],
-        )
+        # 1) where filter (best)
+        try:
+            got = self.collection.get(where={"menu": q}, include=["metadatas"])
+            ids = got.get("ids") or []
+            mds = got.get("metadatas") or []
+            if ids and mds and isinstance(mds[0], dict):
+                md0 = mds[0]
+                menu_md = _norm_ws(str(md0.get("menu", "")))
+                if menu_md == q:
+                    return ConfirmedMenu(
+                        menu_id=str(ids[0]),
+                        menu=menu_md,
+                        ingredients=_split_csv_like(md0.get("ingredients")),
+                        alg_tags=_split_csv_like(md0.get("alg_tags")),
+                        matched_variant="",
+                        menu_description_ko=str(md0.get("menu_description_ko") or "").strip(),
+                    )
+        except Exception:
+            pass
 
-        ids = (raw.get("ids") or [[]])[0] if isinstance(raw.get("ids"), list) else []
-        metadatas = (raw.get("metadatas") or [[]])[0] if isinstance(raw.get("metadatas"), list) else []
-        distances = (raw.get("distances") or [[]])[0] if isinstance(raw.get("distances"), list) else []
+        # 2) fallback: semantic query then exact scan
+        try:
+            raw = self.collection.query(query_texts=[q], n_results=50, include=["metadatas", "ids"])
+            ids = (raw.get("ids") or [[]])[0]
+            mds = (raw.get("metadatas") or [[]])[0]
+            for i, md in enumerate(mds or []):
+                if not isinstance(md, dict):
+                    continue
+                menu_md = _norm_ws(str(md.get("menu", "")))
 
-        if not ids:
-            ids = [f"idx_{i}" for i in range(len(metadatas))]
+                # ✅ 2-1) canonical menu exact
+                if menu_md == q:
+                    menu_id = str(ids[i]) if i < len(ids) else f"idx_{i}"
+                    return ConfirmedMenu(
+                        menu_id=menu_id,
+                        menu=menu_md,
+                        ingredients=_split_csv_like(md.get("ingredients")),
+                        alg_tags=_split_csv_like(md.get("alg_tags")),
+                        matched_variant="",
+                        menu_description_ko=str(md.get("menu_description_ko") or "").strip(),
+                    )
 
-        out: List[Candidate] = []
-        for _id, md, dist in zip(ids, metadatas, distances):
-            meta = _parse_metadata(md or {})
-            cand = Candidate(
-                id=str(_id),
-                embed_score=float(_to_similarity(dist)),
-                menu=str(meta.get("menu", "")),
-                variants=list(meta.get("variants") or []),
-                ingredients_ko=list(meta.get("ingredients_ko") or []),
-                alg_tags=list(meta.get("alg_tags") or []),
-                source=str(meta.get("source", "")),
-            )
+                # ✅ 2-2) variants exact (alias -> canonical)
+                variants = _split_csv_like(md.get("variants"))
+                variants_norm = [_norm_ws(v) for v in variants]
+                if q in variants_norm:
+                    menu_id = str(ids[i]) if i < len(ids) else f"idx_{i}"
+                    return ConfirmedMenu(
+                        menu_id=menu_id,
+                        menu=menu_md,
+                        ingredients=_split_csv_like(md.get("ingredients")),
+                        alg_tags=_split_csv_like(md.get("alg_tags")),
+                        matched_variant=q,
+                        menu_description_ko=str(md.get("menu_description_ko") or "").strip(),
+                    )
+        except Exception:
+            pass
 
-            # Variant-aware jamo (A-plan)
-            variants = [cand.menu] + cand.variants
-            best_jamo = 0.0
-            best_v = cand.menu
-            for v in variants:
-                js = jamo_similarity(q, v)
-                if js > best_jamo:
-                    best_jamo = js
-                    best_v = v
-            cand.jamo_score = best_jamo
-            cand.best_variant = best_v
-
-            # Default final score (caller can recompute with different weights later)
-            cand.final_score = (
-                DEFAULT_FINAL_W_EMBED * float(cand.embed_score)
-                + DEFAULT_FINAL_W_JAMO * float(cand.jamo_score)
-            )
-
-            out.append(cand)
-
-        out.sort(key=lambda x: x.final_score, reverse=True)
-        return q, out, {"mode": "embed", "top_k": int(top_k)}
+        return None
 
 
-_DEFAULT_RETRIEVER: Optional[ChromaMenuRetriever] = None
+_DEFAULT: Optional[ChromaMenuRetriever] = None
 
 
 def get_retriever() -> ChromaMenuRetriever:
-    global _DEFAULT_RETRIEVER
-    if _DEFAULT_RETRIEVER is None:
-        _DEFAULT_RETRIEVER = ChromaMenuRetriever()
-    return _DEFAULT_RETRIEVER
+    global _DEFAULT
+    if _DEFAULT is None:
+        _DEFAULT = ChromaMenuRetriever()
+    return _DEFAULT
 
 
-# ==============================
-# MATCH POLICY
-# ==============================
-def match_menu_norm(
-    menu_norm: str,
-    *,
-    raw_menu: Optional[str] = None,
-    top_k: int = DEFAULT_TOP_K,
-    save_top_n: int = DEFAULT_SAVE_TOP_N,
-    embed_ambiguous: float = 0.90,  # NOTE: kept for CLI compatibility (currently unused by policy)
-    jamo_threshold: float = 0.55,
-    score_threshold: float = DEFAULT_SCORE_THRESHOLD,
-    final_w_embed: float = DEFAULT_FINAL_W_EMBED,
-    final_w_jamo: float = DEFAULT_FINAL_W_JAMO,
-    final_close_threshold: float = DEFAULT_FINAL_CLOSE_THRESHOLD,
-    include_debug: bool = False,
-) -> Dict[str, Any]:
-    """Menu-name-only matching."""
-    retriever = get_retriever()
-    used_query, cands, dbg = retriever.query(menu_norm=menu_norm, top_k=int(top_k))
+def match_exact(menu_norm: str) -> Dict[str, Any]:
+    """
+    Returns:
+      {
+        "status": "exact" | "unknown",
+        "used_query": <normalized menu_norm or None>,
+        "confirmed": {menu_id, menu, ingredients, alg_tags} | None
+      }
+    """
+    q = _norm_ws(menu_norm)
+    if not q:
+        return {"status": "unknown", "used_query": None, "confirmed": None}
 
-    if not used_query:
-        return {
-            "status": "NOT_FOUND_EMPTY_QUERY",
-            "used_query": None,
-            "decided_menu": raw_menu if raw_menu else None,
-            "decision_method": "EMPTY_QUERY",
-            "best_match": None,
-            "candidates": [],
-            "signals": {},
-            "debug": dbg if include_debug else None,
-        }
-
-    if not cands:
-        return {
-            "status": "NOT_FOUND_NO_CANDIDATES",
-            "used_query": used_query,
-            "decided_menu": raw_menu if raw_menu else None,
-            "decision_method": "NO_CANDIDATES",
-            "best_match": None,
-            "candidates": [],
-            "signals": {},
-            "debug": dbg if include_debug else None,
-        }
-
-    # Recompute final_score with passed weights
-    for c in cands:
-        c.final_score = float(final_w_embed) * float(c.embed_score) + float(final_w_jamo) * float(c.jamo_score)
-    cands.sort(key=lambda x: x.final_score, reverse=True)
-
-    top1 = cands[0]                       # best final score
-    top1_embed = max(cands, key=lambda x: x.embed_score)
-    best_jamo = max(cands, key=lambda x: x.jamo_score)
-
-    # Hard cutoff: if even best jamo is too low, treat as NOT_FOUND
-    if float(best_jamo.jamo_score) < JAMO_HARD_CUTOFF:
-        return {
-            "status": "NOT_FOUND_BELOW_THRESHOLD",
-            "used_query": used_query,
-            "decided_menu": raw_menu if raw_menu else None,
-            "decision_method": "JAMO_HARD_CUTOFF",
-            "best_match": None,
-            "candidates": [
-                {
-                    "id": c.id,
-                    "menu": c.menu,
-                    "embed_score": float(c.embed_score),
-                    "jamo_score": float(c.jamo_score),
-                    "final_score": float(c.final_score),
-                }
-                for c in cands[: max(1, int(save_top_n))]
-            ],
-            "signals": {
-                "best_jamo_menu": best_jamo.menu,
-                "best_jamo_score": float(best_jamo.jamo_score),
-                "thresholds": {"jamo_hard_cutoff": float(JAMO_HARD_CUTOFF)},
-            },
-            "debug": dbg if include_debug else None,
-        }
-
-    qn = _norm_space(used_query)
-    top1_menu_norm = _norm_space(top1.menu)
-    variant_norms = {_norm_space(v) for v in ([top1.menu] + (top1.variants or []))}
-
-    # Initialize gating booleans so debug is always safe
-    embed_ok = True
-    jamo_ok = True
-    close_ok = True
-
-    if qn and qn in variant_norms:
-        status = "EXACT"
-        decided_menu = top1.menu
-        decision_method = "EXACT_VARIANT_MATCH" if qn != top1_menu_norm else "EXACT"
-    else:
-        embed_ok = float(top1_embed.embed_score) >= float(score_threshold)
-        jamo_ok = float(best_jamo.jamo_score) >= float(jamo_threshold)
-        close_ok = float(top1.final_score) >= float(final_close_threshold)
-
-        if embed_ok and jamo_ok and close_ok:
-            status = "CLOSE"
-            decided_menu = raw_menu if raw_menu else None
-            decision_method = "CLOSE_BY_FINAL_SCORE"
-        else:
-            status = "NOT_FOUND_BELOW_THRESHOLD"
-            decided_menu = raw_menu if raw_menu else None
-            decision_method = "GATED_OUT"
-
-    save_n = max(1, int(save_top_n))
-    cand_out = [
-        {
-            "id": c.id,
-            "menu": c.menu,
-            "embed_score": float(c.embed_score),
-            "jamo_score": float(c.jamo_score),
-            "final_score": float(c.final_score),
-            "source": c.source,
-            "best_variant": c.best_variant,
-        }
-        for c in cands[:save_n]
-    ]
-
-    best_out = {
-        "id": top1.id,
-        "menu": top1.menu,
-        "embed_score": float(top1.embed_score),
-        "jamo_score": float(top1.jamo_score),
-        "final_score": float(top1.final_score),
-        "ingredients_ko": top1.ingredients_ko,
-        "alg_tags": top1.alg_tags,
-        "source": top1.source,
-        "best_variant": top1.best_variant,
-    }
-
-    signals = {
-        "top1_final_menu": top1.menu,
-        "top1_final": float(top1.final_score),
-        "top1_embed_menu": top1_embed.menu,
-        "top1_embed": float(top1_embed.embed_score),
-        "best_jamo_menu": best_jamo.menu,
-        "best_jamo": float(best_jamo.jamo_score),
-        "best_variant": top1.best_variant,
-        "best_variant_jamo": float(top1.jamo_score),
-        "thresholds": {
-            "embed_min": float(score_threshold),
-            "jamo_min": float(jamo_threshold),
-            "final_close": float(final_close_threshold),
-            "final_w_embed": float(final_w_embed),
-            "final_w_jamo": float(final_w_jamo),
-            "jamo_hard_cutoff": float(JAMO_HARD_CUTOFF),
-        },
-        "compat": {
-            "embed_ambiguous": float(embed_ambiguous),  # accepted but not used
-        },
-    }
-
-    debug_out = None
-    if include_debug:
-        debug_out = dict(dbg or {})
-        debug_out.update(
-            {
-                "policy": "EXACT_ONLY_CONFIRM",
-                "query_norm": qn,
-                "top1_menu_norm": top1_menu_norm,
-                "embed_ok": bool(embed_ok),
-                "jamo_ok": bool(jamo_ok),
-                "close_ok": bool(close_ok),
-            }
-        )
+    r = get_retriever()
+    hit = r.get_exact(q)
+    if hit is None:
+        return {"status": "unknown", "used_query": q, "confirmed": None}
 
     return {
-        "status": status,
-        "used_query": used_query,
-        "decided_menu": decided_menu,
-        "decision_method": decision_method,
-        "best_match": best_out,
-        "candidates": cand_out,
-        "signals": signals,
-        "debug": debug_out,
+        "status": "exact",
+        "used_query": q,
+        "confirmed": {
+            "menu_id": hit.menu_id,
+            "menu": hit.menu,
+            "ingredients": hit.ingredients,
+            "alg_tags": hit.alg_tags,
+            "matched_variant": hit.matched_variant or None,
+            # ✅ NEW: short Korean description (optional)
+            "menu_description_ko": hit.menu_description_ko,
+        },
     }
