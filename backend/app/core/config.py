@@ -9,10 +9,10 @@ ENV_PATH = Path(__file__).resolve().parents[3] / ".env"
 load_dotenv(ENV_PATH)
 
 # ---- DB ----
-DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
-DB_PORT = os.getenv("DB_PORT", "3306")
-DB_NAME = os.getenv("DB_NAME", "final_project")
-DB_USER = os.getenv("DB_USER", "root")
+DB_HOST = os.getenv("DB_HOST", "")
+DB_PORT = os.getenv("DB_PORT", "")
+DB_NAME = os.getenv("DB_NAME", "")
+DB_USER = os.getenv("DB_USER", "")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 
 DATABASE_URL = (
@@ -67,7 +67,7 @@ else:
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 # ---- Storage ----
-STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "local")  # local | s3
+STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "s3")  # local | s3
 
 # 로컬 업로드 루트 (기본: <PROJECT_ROOT>/uploads)
 LOCAL_UPLOAD_ROOT = Path(os.getenv("LOCAL_UPLOAD_ROOT", str(PROJECT_ROOT / "uploads"))).resolve()

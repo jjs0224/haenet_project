@@ -1,415 +1,303 @@
-import { useEffect, useRef, useState } from "react";
-import { ReviewAPI } from "../../api/reviewApi";
-import { useNavigate } from "react-router-dom";
-import CaptureFlow from "../../components/camera/CaptureFlow"; // ✅ add
-import styles from "./ReviewCreate.module.css";
+// src/features/review/ReviewCreate.jsx
+// ✅ AWS 운영(큐/worker) 구조 대응: /verify(202 job_id) → job/{job_id} 폴링 → DONE 결과(extracted) 사용
+// ⚠️ 프로젝트 폴더 구조에 따라 import 경로만 너 환경에 맞게 조정해줘.
 
-export default function ReviewCreateInline({ onCreated }) {
-  const navigate = useNavigate();
+import React, { useMemo, useState } from "react";
+import ReviewAPI from "./reviewApi"; // 예: src/features/review/reviewApi.js
 
-  // Step1
+export default function ReviewCreate() {
+  // ---- form fields ----
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [rating, setRating] = useState(5);
+  const [menuNameOverride, setMenuNameOverride] = useState("");
+
+  // receipt verify
   const [receiptFile, setReceiptFile] = useState(null);
-  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState(null);
-  const [receiptId, setReceiptId] = useState(null);
+  const [receiptJobId, setReceiptJobId] = useState(""); // 백엔드에서는 job_id를 receipt_id처럼 사용(ReceiptSessionService key)
   const [extracted, setExtracted] = useState(null);
-  const [menuList, setMenuList] = useState([]);
-  const [menuConfirmed, setMenuConfirmed] = useState(false);
 
-  // ✅ camera toggle
-  const [showCamera, setShowCamera] = useState(false);
+  // review images (0~3)
+  const [reviewImages, setReviewImages] = useState([]);
 
-    // Step2
-    const [title, setTitle] = useState("");
-    const [content, setContent] = useState("");
-    const [rating, setRating] = useState(5);
+  // ui
+  const [loadingVerify, setLoadingVerify] = useState(false);
+  const [loadingSubmit, setLoadingSubmit] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
 
-  const [images, setImages] = useState([]);
-  const [previewUrls, setPreviewUrls] = useState([]);
+  // ---- derived ----
+  const coords = useMemo(() => {
+    // extracted 구조가 store 중심이면 ext.store.coords
+    // 혹시 ext.coords로 내려오는 케이스도 방어
+    return extracted?.store?.coords || extracted?.coords || null;
+  }, [extracted]);
 
-    const receiptInputRef = useRef(null);
-    const imageInputRef = useRef(null);
+  const storeName = extracted?.store?.name_ko || extracted?.store?.store_name || extracted?.store?.name || "";
+  const storeAddr = extracted?.store?.address || extracted?.store?.store_address || "";
+  const menuKo = Array.isArray(extracted?.menu) ? extracted.menu.map((m) => m?.name_ko).filter(Boolean) : [];
 
-    const [loadingVerify, setLoadingVerify] = useState(false);
-    const [loadingCreate, setLoadingCreate] = useState(false);
-    const [msg, setMsg] = useState("");
-    const [err, setErr] = useState("");
+  // ---- handlers ----
+  const resetVerifyState = () => {
+    setReceiptJobId("");
+    setExtracted(null);
+  };
 
-  useEffect(() => {
-    previewUrls.forEach((u) => URL.revokeObjectURL(u));
-    const next = images.map((f) => URL.createObjectURL(f));
-    setPreviewUrls(next);
-    return () => next.forEach((u) => URL.revokeObjectURL(u));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [images]);
+  const onPickReceipt = (e) => {
+    const f = e.target.files?.[0] || null;
+    setReceiptFile(f);
+    resetVerifyState();
+    setErr("");
+    setMsg("");
+  };
 
-    const verify = async () => {
-        setErr("");
-        setMsg("");
-        if (!receiptFile) return setErr("Please select the image of the receipt");
+  const onPickReviewImages = (e) => {
+    const files = Array.from(e.target.files || []);
+    setReviewImages(files.slice(0, 3)); // 0~3장
+  };
+
+  // ✅ 핵심: verifyReceipt -> waitReceiptJob 폴링
+  const onVerifyReceipt = async () => {
+    setErr("");
+    setMsg("");
+
+    if (!receiptFile) {
+      setErr("Please select the image of the receipt");
+      return;
+    }
 
     setLoadingVerify(true);
     try {
+      // 1) enqueue (202)
       const r = await ReviewAPI.verifyReceipt(receiptFile);
-      console.log("rrrrr :: ", r)
-      const ext = r.data?.extracted || null;
-      console.log("ext :: ", ext)
+      const jobId = r?.data?.job_id;
+      if (!jobId) throw new Error("verify response has no job_id");
 
-      const coords = ext?.coords;
-      if (!coords || coords.x == null || coords.y == null) {
+      setReceiptJobId(jobId);
+      setMsg("Receipt verification queued. Checking result...");
+
+      // 2) poll until DONE / FAILED
+      const res = await ReviewAPI.waitReceiptJob(jobId, {
+        intervalMs: 2000,
+        maxAttempts: 90, // 약 3분
+      });
+
+      const status = res?.data?.status;
+      if (status !== "DONE") {
+        const emsg = res?.data?.error?.message || res?.data?.error || "receipt verify failed";
+        throw new Error(emsg);
+      }
+
+      // 3) DONE payload
+      const ext = res?.data?.extracted || null;
+      setExtracted(ext);
+
+      const c = ext?.store?.coords || ext?.coords;
+      if (!c || c.x == null || c.y == null) {
+        // 여기서 너가 말한 문구가 뜨던 곳
+        // 이제는 "진짜로 coords가 없는 경우"에만 뜸
         alert("Please attach the receipt with the store address again");
-
-        // reset
-        setReceiptFile(null);
-        if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
-        setReceiptPreviewUrl(null);
-        setReceiptId(null);
-        setExtracted(null);
-        setMenuList([]);
-        setShowCamera(false);
-        if (receiptInputRef.current) receiptInputRef.current.value = "";
-        setLoadingVerify(false);
         return;
       }
 
-      setReceiptId(r.data?.receipt_id);
-      setExtracted(ext);
-
-      if (ext?.menu_en) {
-        const raw = ext.menu_en;
-        const parsed = Array.isArray(raw)
-          ? raw.map((m) => String(m).replace(/["[\]]/g, "").trim())
-          : raw.split(",").map((m) => m.replace(/["[\]]/g, "").trim());
-        setMenuList(parsed.filter(Boolean));
-      }
-
-      setMsg("Receipt certified. Please check the menu.");
+      setMsg("Receipt verified successfully ✅");
     } catch (e) {
-      setErr(
-        e?.response?.data?.detail ||
-          e?.message ||
-          "Receipt authentication failed"
-      );
+      setErr(e?.message || String(e));
+      setMsg("");
+      // 실패 시 verify 결과 초기화
+      resetVerifyState();
     } finally {
       setLoadingVerify(false);
     }
   };
 
-    const confirmMenu = () => {
-        setMenuConfirmed(true);
-        setMsg("Checked the menu. Please write a review.");
-    };
-
-  const cancelMenu = () => {
-    setReceiptId(null);
-    setExtracted(null);
-    setMenuList([]);
-    setReceiptFile(null);
-    if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
-    setReceiptPreviewUrl(null);
-    setMenuConfirmed(false);
-    setShowCamera(false);
-    setMsg("");
+  const onSubmitReview = async () => {
     setErr("");
-    if (receiptInputRef.current) receiptInputRef.current.value = "";
-  };
+    setMsg("");
 
-    const removeMenu = (idx) => {
-        setMenuList((prev) => prev.filter((_, i) => i !== idx));
-    };
+    if (!receiptJobId) {
+      setErr("Please verify the receipt first.");
+      return;
+    }
+    if (!title.trim()) {
+      setErr("Please enter the title.");
+      return;
+    }
+    if (!content.trim()) {
+      setErr("Please enter the content.");
+      return;
+    }
 
-  const onPickImages = (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
+    // coords가 꼭 필요 정책이면 여기서 막고, 아니면 허용해도 됨
+    if (!coords || coords.x == null || coords.y == null) {
+      setErr("No coordinates found. Please verify with a receipt that contains store address.");
+      return;
+    }
 
-        setErr("");
-        setMsg("");
-
-    setImages((prev) => {
-      const merged = [...prev, ...files];
-      if (merged.length > 3) {
-        setErr("Upload up to three images.");
-        return prev;
-      }
-      return merged;
-    });
-
-    if (imageInputRef.current) imageInputRef.current.value = "";
-  };
-
-  const removeImage = (idx) => {
-    setImages((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-    const create = async () => {
-        setErr("");
-        setMsg("");
-
-        if (!receiptId) return setErr("Please verify the receipt first");
-        if (!title.trim()) return setErr("Please enter the title");
-        if (!content.trim()) return setErr("Please enter the content");
-        if (images.length > 3) return setErr("upload up to three images.");
-
-    setLoadingCreate(true);
+    setLoadingSubmit(true);
     try {
-      const r = await ReviewAPI.createFromReceipt({
-        receipt_id: receiptId,
-        title,
-        content,
-        rating,
-        menu_name: JSON.stringify(menuList),
-        images,
+      // 백엔드 create_review_from_receipt는 receipt_id로 session을 찾음
+      // 너희 구조는 job_id == receipt_id 로 저장하는 형태라서 receiptJobId 그대로 넘기면 됨
+      const resp = await ReviewAPI.createReviewFromReceipt({
+        receipt_id: receiptJobId,
+        title: title.trim(),
+        content: content.trim(),
+        rating: Number(rating),
+        menu_name_override: menuNameOverride?.trim() ? menuNameOverride.trim() : null,
+        images: reviewImages, // 0~3
       });
 
-      setMsg("Completion of review creation");
-      navigate("/review?mine=true");
-      onCreated?.(r.data);
+      setMsg(`Review created ✅ (id: ${resp?.data?.review_id ?? "-"})`);
 
-      setReceiptFile(null);
-      if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
-      setReceiptPreviewUrl(null);
-      setReceiptId(null);
-      setExtracted(null);
-      setMenuList([]);
-      setMenuConfirmed(false);
-      setShowCamera(false);
+      // reset form (원하면 유지해도 됨)
       setTitle("");
       setContent("");
       setRating(5);
-      setImages([]);
+      setMenuNameOverride("");
+      setReceiptFile(null);
+      setReviewImages([]);
+      resetVerifyState();
     } catch (e) {
-      setErr(e?.response?.data?.detail || e?.message || "Failed to create review");
+      setErr(e?.message || String(e));
     } finally {
-      setLoadingCreate(false);
+      setLoadingSubmit(false);
     }
   };
 
   return (
-    <div className={styles.reviewCreateContainer}>
-      {loadingVerify && (
-        <div className={styles.loadingOverlay}>
-          <div className={styles.loadingBox}>
-            <div className={styles.loadingSpinner} />
-            <p className={styles.loadingText}>Detecting Receipt...</p>
-          </div>
+    <div style={{ maxWidth: 880, margin: "0 auto", padding: 16 }}>
+      <h2 style={{ marginBottom: 12 }}>Create Review</h2>
+
+      {err && (
+        <div style={{ background: "#ffe6e6", padding: 12, borderRadius: 8, marginBottom: 10 }}>
+          <b>Error</b>
+          <div>{err}</div>
+        </div>
+      )}
+      {msg && (
+        <div style={{ background: "#e9ffe6", padding: 12, borderRadius: 8, marginBottom: 10 }}>
+          <b>Info</b>
+          <div>{msg}</div>
         </div>
       )}
 
-      <h2 className={styles.reviewCreateTitle}>Create Review</h2>
+      {/* 1) Receipt Verify */}
+      <section style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+        <h3 style={{ marginTop: 0 }}>1) Receipt Verification</h3>
 
-      {/* Step 1 */}
-      {!receiptId && (
-        <div className={styles.stepSection}>
-          <div className={styles.stepHeader}>Verify Receipt</div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <input type="file" accept="image/*" onChange={onPickReceipt} />
+          <button type="button" onClick={onVerifyReceipt} disabled={loadingVerify || !receiptFile}>
+            {loadingVerify ? "Verifying..." : "Verify Receipt"}
+          </button>
 
-          {/* ✅ camera page */}
-          {showCamera && !receiptFile && (
-            <CaptureFlow
-              onDone={(file) => {
-                setReceiptFile(file);
-                if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
-                setReceiptPreviewUrl(URL.createObjectURL(file));
-                setShowCamera(false); // back to normal UI
-              }}
+          {receiptJobId && (
+            <span style={{ fontSize: 12, color: "#666" }}>
+              job_id: <code>{receiptJobId}</code>
+            </span>
+          )}
+        </div>
+
+        {/* extracted preview */}
+        {extracted && (
+          <div style={{ marginTop: 14, padding: 12, borderRadius: 8, background: "#fafafa" }}>
+            <div style={{ marginBottom: 6 }}>
+              <b>Store</b>: {storeName || "-"}
+            </div>
+            <div style={{ marginBottom: 6 }}>
+              <b>Address</b>: {storeAddr || "-"}
+            </div>
+            <div style={{ marginBottom: 6 }}>
+              <b>Coords</b>: {coords ? `${coords.x}, ${coords.y}` : "-"}
+            </div>
+            <div>
+              <b>Menu(KO)</b>: {menuKo.length ? menuKo.join(", ") : "-"}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* 2) Review Form */}
+      <section style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
+        <h3 style={{ marginTop: 0 }}>2) Review</h3>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
+          <label>
+            <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Title</div>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="title"
+              style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
             />
+          </label>
+
+          <label>
+            <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Content</div>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="content"
+              rows={6}
+              style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
+            />
+          </label>
+
+          <label>
+            <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Rating (1~5)</div>
+            <input
+              type="number"
+              min={1}
+              max={5}
+              value={rating}
+              onChange={(e) => setRating(e.target.value)}
+              style={{ width: 120, padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
+            />
+          </label>
+
+          <label>
+            <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
+              Menu Name Override (optional)
+            </div>
+            <input
+              value={menuNameOverride}
+              onChange={(e) => setMenuNameOverride(e.target.value)}
+              placeholder='ex) "김치찌개, 공기밥"'
+              style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
+            />
+          </label>
+
+          <label>
+            <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Review Images (0~3)</div>
+            <input type="file" accept="image/*" multiple onChange={onPickReviewImages} />
+            {reviewImages.length > 0 && (
+              <div style={{ fontSize: 12, color: "#666", marginTop: 6 }}>
+                selected: {reviewImages.map((f) => f.name).join(", ")}
+              </div>
+            )}
+          </label>
+
+          <button
+            type="button"
+            onClick={onSubmitReview}
+            disabled={loadingSubmit || !receiptJobId}
+            style={{
+              padding: "12px 14px",
+              borderRadius: 10,
+              border: "1px solid #222",
+              cursor: loadingSubmit || !receiptJobId ? "not-allowed" : "pointer",
+            }}
+          >
+            {loadingSubmit ? "Submitting..." : "Create Review"}
+          </button>
+
+          {!receiptJobId && (
+            <div style={{ fontSize: 12, color: "#999" }}>
+              * You must verify the receipt first.
+            </div>
           )}
-
-          {/* ✅ normal upload UI (your original) */}
-          {!showCamera && (
-            <>
-              <div className={styles.receiptUpload}>
-                <input
-                  ref={receiptInputRef}
-                  type="file"
-                  accept="image/*"
-                  disabled={loadingVerify}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] || null;
-                    setReceiptFile(f);
-                    if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
-                    setReceiptPreviewUrl(f ? URL.createObjectURL(f) : null);
-                  }}
-                  className={styles.fileInput}
-                />
-
-                {/* ✅ new camera button beside check */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setErr("");
-                    setMsg("");
-                    setShowCamera(true);
-                  }}
-                  disabled={loadingVerify}
-                  className={styles.btnCamera} // (or reuse btnPrimary if you want)
-                  title="Open Camera"
-                >
-                  📷
-                </button>
-
-                <button
-                  onClick={verify}
-                  disabled={loadingVerify}
-                  className={styles.btnPrimary}
-                >
-                  {loadingVerify ? "⏳" : "✔"}
-                </button>
-              </div>
-
-              {receiptPreviewUrl && (
-                <div className={styles.receiptPreview}>
-                  <img
-                    src={receiptPreviewUrl}
-                    alt="Preview Receipts"
-                    className={styles.receiptPreviewImage}
-                  />
-                </div>
-              )}
-            </>
-          )}
         </div>
-      )}
-
-      {/* Step 2 */}
-      {receiptId && extracted && (
-        <div className={styles.stepSection}>
-          <div className={styles.stepHeader}>Confirm Receipt Details</div>
-          <p>
-            {extracted.store_name} / {extracted.store_name_en}
-          </p>
-          <div className={styles.menuConfirmSection}>
-            {!menuConfirmed && (
-              <p className={styles.menuConfirmText}>Please only select your menu</p>
-            )}
-            <div className={styles.menuList}>
-              {menuList.length > 0 ? (
-                menuList.map((menu, idx) => (
-                  <div key={idx} className={styles.menuItem}>
-                    <span className={styles.menuIcon}>🍽️</span>
-                    <span className={styles.menuName}>{menu}</span>
-                    {!menuConfirmed && (
-                      <button
-                        type="button"
-                        onClick={() => removeMenu(idx)}
-                        className={styles.btnRemoveMenu}
-                        title="Delete Menu"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <p className={styles.menuConfirmText}>There's no menu.</p>
-              )}
-            </div>
-
-            {!menuConfirmed && (
-              <div className={styles.menuConfirmButtons}>
-                <button
-                  onClick={confirmMenu}
-                  disabled={menuList.length === 0}
-                  className={styles.btnConfirm}
-                >
-                  Confirm
-                </button>
-                <button onClick={cancelMenu} className={styles.btnCancel}>
-                  Cancel
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Step 3 */}
-      {receiptId && menuConfirmed && (
-        <div className={styles.stepSection}>
-          <div className={styles.stepHeader}>Create a review</div>
-
-          <div className={styles.reviewForm}>
-            <div className={styles.formGroup}>
-              <label className={styles.formLabel}>Title</label>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Enter review title"
-                className={styles.formInput}
-              />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label className={styles.formLabel}>Content</label>
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Enter review content"
-                rows={6}
-                className={styles.formTextarea}
-              />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label className={styles.formLabel}>Rating</label>
-              <div className={styles.ratingSelect}>
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <span
-                    key={n}
-                    onClick={() => setRating(n)}
-                    className={`${styles.star} ${n <= rating ? styles.active : ""}`}
-                  >
-                    ★
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className={styles.formGroup}>
-              <label className={styles.formLabel}>추가 이미지 (max 3)</label>
-              <input
-                ref={imageInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={onPickImages}
-                disabled={images.length >= 3}
-                className={styles.fileInput}
-              />
-              <div className={styles.imageCount}>Additional Images {images.length}/3</div>
-
-              {previewUrls.length > 0 && (
-                <div className={styles.imagePreviewList}>
-                  {previewUrls.map((url, idx) => (
-                    <div key={idx} className={styles.imagePreviewItem}>
-                      <img src={url} alt={`preview-${idx}`} className={styles.previewImage} />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(idx)}
-                        className={styles.btnRemoveImage}
-                        title="Delete"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <button onClick={create} disabled={loadingCreate} className={styles.btnSubmit}>
-              {loadingCreate ? "Creating..." : "Save"}
-            </button>
-          </div>
-        </div>
-      )}
-
-            {msg && (
-                <div className={`${styles.message} ${styles.success}`}>
-                    {msg}
-                </div>
-            )}
-            {err && (
-                <div className={`${styles.message} ${styles.error}`}>{err}</div>
-            )}
-        </div>
-    );
+      </section>
+    </div>
+  );
 }
