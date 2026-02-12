@@ -53,6 +53,9 @@ export const ReviewAPI = {
       if (f) fd.append("images", f);
     }
 
+//    // ✅ 최대 3장 제한(프론트에서도 제한하지만 여기서도 한번 더 안전)
+//    (images || []).slice(0, 3).forEach((img) => fd.append("images", img));
+
     // ✅ 여기 한 줄이 빌드 깨던 원인 (axiosInstance -> api)
     return api.post("/review/create", fd);
   },
