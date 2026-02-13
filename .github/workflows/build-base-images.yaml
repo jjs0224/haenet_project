@@ -137,6 +137,9 @@ jobs:
                       ${{ env.WORKER_BASE_IMAGE }}:latest
                       ${{ env.WORKER_BASE_IMAGE }}:${{ github.sha }}
                       ${{ env.WORKER_BASE_IMAGE }}:build-${{ github.run_number }}
+                  build-args: |
+                      WORKER_REQUIREMENTS=requirements_cu.txt
+                      PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu126
                   cache-from: type=gha,scope=worker-base
                   cache-to: type=gha,mode=max,scope=worker-base
 
