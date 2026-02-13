@@ -91,6 +91,22 @@ class S3UploadStorage:
         delete_list = [{"Key": o["Key"]} for o in contents]
         self.client.delete_objects(Bucket=self.bucket, Delete={"Objects": delete_list})
 
+    def save_temp_bytes(
+        self,
+        *,
+        prefix_key: str,
+        file_name: str,
+        data: bytes,
+        mime_type: str = "application/octet-stream",
+    ) -> str:
+        """
+        Temporary helper file save for non-image artifacts (e.g., user_profile.json).
+        Returns stored object key.
+        """
+        key = f"{prefix_key.rstrip('/')}/{file_name}"
+        self.client.put_object(Bucket=self.bucket, Key=key, Body=data, ContentType=mime_type)
+        return key
+
     async def save_permanent(
         self,
         *,

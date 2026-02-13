@@ -1,4 +1,5 @@
 import os
+import json
 import uuid
 from pathlib import Path
 from typing import Callable, Tuple, Optional
@@ -188,4 +189,24 @@ async def save_permanent_bytes(
         origin_name=origin_name,
         mime_type=mime_type,
         sort_order=sort_order,
+    )
+
+
+def save_temp_json(*, prefix_key: str, file_name: str, payload: dict) -> str:
+    """
+    Save JSON under an existing temp prefix.
+    - local: <prefix_key>/<file_name>
+    - s3:    <prefix_key>/<file_name>
+    Returns stored key/path.
+    """
+    storage = get_storage()
+    if not hasattr(storage, "save_temp_bytes"):
+        raise RuntimeError("Storage does not support save_temp_bytes()")
+
+    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    return storage.save_temp_bytes(
+        prefix_key=prefix_key,
+        file_name=file_name,
+        data=data,
+        mime_type="application/json",
     )

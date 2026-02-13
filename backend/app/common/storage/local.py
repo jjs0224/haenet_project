@@ -96,6 +96,24 @@ class LocalUploadStorage:
         import shutil
         shutil.rmtree(d, ignore_errors=True)
 
+    def save_temp_bytes(
+        self,
+        *,
+        prefix_key: str,
+        file_name: str,
+        data: bytes,
+        mime_type: str = "application/octet-stream",
+    ) -> str:
+        """
+        Temporary helper file save for non-image artifacts (e.g., user_profile.json).
+        Returns stored file key/path.
+        """
+        d = Path(prefix_key)
+        d.mkdir(parents=True, exist_ok=True)
+        p = d / file_name
+        p.write_bytes(data)
+        return str(p)
+
     async def save_permanent(
         self,
         *,

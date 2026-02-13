@@ -17,6 +17,16 @@ from backend.app.features.menu.service import run_menu_ai
 from backend.app.core.database import get_db
 from sqlalchemy.orm import Session
 from backend.app.common.service.ai_member_info import build_user_profile_payload
+from backend.app.common.service.file_upload_service import (
+    ensure_local_path,
+    save_temp_json,
+    upload_input_file,
+)
+from backend.app.common.utils.debug import log_exception
+from backend.app.core.database import get_db
+from backend.app.core.job_queue import connect_redis, enqueue_task, utc_now_iso
+from backend.app.core.security.deps import get_current_member
+from backend.app.features.menu.schemas import MenuEnqueueResponse, MenuJobResponse
 
 router = APIRouter(prefix="/menu", tags=["menu"])
 
@@ -48,73 +58,55 @@ async def upload_menu(
 
     local_path, cleanup = ensure_local_path(obj)
 
-    # runs_root는 기존 그대로 유지
-    runs_root = Path(tmp_prefix) / "ai_runs"
-
-    # user_profile_json도 tmp_prefix 아래에 생성 (정책 유지: 끝나면 temp 삭제)
-    user_profile_json_path = Path(tmp_prefix) / "user_profile.json"
-
     try:
+        # Prefer user_profile from client if provided, otherwise build from DB.
+        profile_payload: Dict[str, Any] | None = None
+        raw_profile = (user_profile or "").strip()
+        if raw_profile:
+            try:
+                parsed = json.loads(raw_profile)
+                if not isinstance(parsed, dict):
+                    raise ValueError("user_profile must be a JSON object")
+                profile_payload = parsed
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"user_profile invalid: {e}")
 
-        # 현 위치 알레르기 정보 넘겨주면 끝
-        payload = build_user_profile_payload(db, current.member_id)
+        if profile_payload is None:
+            try:
+                profile_payload = build_user_profile_payload(db, current.member_id)
+            except Exception as e:
+                log_exception("menu.profile_build", e)
+                profile_payload = {"allergy_tags": [], "avoid_foods": [], "religion": []}
 
-        user_profile_json_path.parent.mkdir(parents=True, exist_ok=True)
-        user_profile_json_path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2),
-            encoding="utf-8",
+        # Save profile JSON next to input image (same temp prefix/path group).
+        # local: <tmp>/<menu>/<job_id>/user_profile.json
+        # s3:    upload/tmp/menu/<job_id>/user_profile.json
+        user_profile_file_key = save_temp_json(
+            prefix_key=obj.prefix_key,
+            file_name="user_profile.json",
+            payload=profile_payload,
         )
-        user_profile_json = str(user_profile_json_path)
 
+        image_b64 = base64.b64encode(Path(local_path).read_bytes()).decode("ascii")
 
-        # --- (A) current에서 가능한 정보만 뽑아서 user_profile.json 생성 ---
-        # 필드명은 프로젝트마다 다르니, 있는 것만 가져오게 방어적으로 구성
-        # allergy_tags = getattr(current, "allergy_tags", None) #
-        # avoid_foods = getattr(current, "avoid_foods", None) # dislike
-        # religion = getattr(current, "religion", None) #
-        #
-        # print("allergy_tags :: ", allergy_tags)
-        # print("avoid_foods :: ", avoid_foods)
-        # print("religion :: ", religion)
-        #
-        # # 어떤 백엔드는 current.profile 같은 중첩 구조일 수 있어서 한 번 더 시도
-        # profile = getattr(current, "profile", None)
-        # if profile is not None:
-        #     if allergy_tags is None:
-        #         allergy_tags = getattr(profile, "allergy_tags", None)
-        #     if avoid_foods is None:
-        #         avoid_foods = getattr(profile, "avoid_foods", None)
-        #     if religion is None:
-        #         religion = getattr(profile, "religion", None)
-        #
-        # # 값이 하나라도 있으면 파일을 생성해서 Step5에 전달
-        # user_profile_json = None
-        # if allergy_tags or avoid_foods or religion:
-        #     payload = {
-        #         "allergy_tags": list(allergy_tags or []),
-        #         "avoid_foods": list(avoid_foods or []),
-        #         "religion": religion,
-        #     }
-        #     # tmp_prefix가 local 모드에서 로컬 경로라는 전제 하에 저장됨
-        #     user_profile_json_path.parent.mkdir(parents=True, exist_ok=True)
-        #     user_profile_json_path.write_text(
-        #         json.dumps(payload, ensure_ascii=False, indent=2),
-        #         encoding="utf-8",
-        #     )
-        #     user_profile_json = str(user_profile_json_path)
+        payload = {
+            "run_id": job_id,
+            "image_base64": image_b64,
+            "user_profile": profile_payload,
+            "user_profile_file_key": user_profile_file_key,
+            "runs_root": "/tmp/ai_runs",
+            "run_step4": True,
+            "run_step5": True,
+            "run_step6": True,
+        }
 
+        try:
+            r = connect_redis()
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"redis unavailable: {type(e).__name__}: {e}")
 
-
-
-
-        # --- (B) pipeline 실행 ---
-        result = run_menu_ai(
-            image_path=local_path,
-            runs_root=runs_root,
-            run_id=job_id,
-            user_profile_json=user_profile_json,
-        )
-        return MenuUploadResponse(job_id=job_id, upload_type="menu", result=result)
+        enqueue_task(r, task="menu_assistant_pipeline", payload=payload, job_id=job_id)
+        return MenuEnqueueResponse(job_id=job_id, status="PENDING", queued_at=utc_now_iso())
 
     except Exception as e:
         log_exception("menu.ai_failed", e)

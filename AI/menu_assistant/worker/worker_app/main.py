@@ -9,6 +9,7 @@ import signal
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import redis
@@ -20,6 +21,61 @@ def _utc_now_iso() -> str:
 
 def _log(msg: str) -> None:
     print(msg, flush=True)
+
+
+def _parse_s3_uri(uri: str) -> tuple[str, str]:
+    if not uri.startswith("s3://"):
+        raise ValueError(f"invalid s3 uri: {uri}")
+    parts = uri[5:].split("/", 1)
+    bucket = parts[0]
+    key = parts[1] if len(parts) > 1 else ""
+    return bucket, key
+
+
+def _load_profile_from_file_key(file_key: str) -> Optional[Dict[str, Any]]:
+    key = (file_key or "").strip()
+    if not key:
+        return None
+
+    # 1) local path
+    p = Path(key)
+    if p.exists():
+        try:
+            obj = json.loads(p.read_text(encoding="utf-8"))
+            return obj if isinstance(obj, dict) else None
+        except Exception as e:
+            _log(f"[worker] warning: failed to read local profile json: {type(e).__name__}: {e}")
+            return None
+
+    # 2) s3://bucket/key
+    if key.startswith("s3://"):
+        try:
+            import boto3
+
+            bucket, s3_key = _parse_s3_uri(key)
+            resp = boto3.client("s3").get_object(Bucket=bucket, Key=s3_key)
+            body = resp["Body"].read().decode("utf-8")
+            obj = json.loads(body)
+            return obj if isinstance(obj, dict) else None
+        except Exception as e:
+            _log(f"[worker] warning: failed to read profile json from s3 uri: {type(e).__name__}: {e}")
+            return None
+
+    # 3) plain s3 object key (bucket from env)
+    try:
+        import boto3
+
+        bucket = (os.getenv("S3_BUCKET") or "").strip()
+        if not bucket:
+            _log("[worker] warning: S3_BUCKET is empty; cannot load user_profile_file_key")
+            return None
+        resp = boto3.client("s3").get_object(Bucket=bucket, Key=key)
+        body = resp["Body"].read().decode("utf-8")
+        obj = json.loads(body)
+        return obj if isinstance(obj, dict) else None
+    except Exception as e:
+        _log(f"[worker] warning: failed to read profile json from s3 key: {type(e).__name__}: {e}")
+        return None
 
 
 def _load_secret_from_file(env_name: str) -> None:
@@ -159,6 +215,14 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         # User profile (supports dict -> temp json, or explicit json path)
         user_profile = payload.get("user_profile")
         user_profile_json = payload.get("user_profile_json")
+        user_profile_file_key = payload.get("user_profile_file_key")
+
+        # Fallback: if profile object is not provided, load from saved key/path.
+        if not user_profile and user_profile_file_key:
+            loaded_profile = _load_profile_from_file_key(str(user_profile_file_key))
+            if loaded_profile:
+                user_profile = loaded_profile
+
         if user_profile and not user_profile_json:
             profile_path = tmp_dir / f"user_profile_{run_id or uuid.uuid4().hex}.json"
             profile_path.write_text(_json.dumps(user_profile, ensure_ascii=False), encoding="utf-8")
@@ -239,7 +303,7 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             "final_output_path": str(final_output_path) if final_output_path.exists() else None,
         }
 
-    raise ValueError(f"Unsupported task: {task}")(f"Unsupported task: {task}")
+    raise ValueError(f"Unsupported task: {task}")
 
 
 def main() -> None:
