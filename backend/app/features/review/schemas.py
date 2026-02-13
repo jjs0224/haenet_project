@@ -3,6 +3,19 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
+class ReviewEnqueueResponse(BaseModel):
+    job_id: str
+    status: str
+    queued_at: str
+
+class ReviewJobResponse(BaseModel):
+    job_id: str
+    status: str
+    extracted: Optional[Dict[str, Any]] = None
+    error: Optional[Any] = None
+    queued_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
 class ReceiptVerifyResponse(BaseModel):
     receipt_id: str
     extracted: Dict[str, Any]

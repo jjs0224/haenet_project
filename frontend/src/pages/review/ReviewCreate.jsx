@@ -50,8 +50,25 @@ export default function ReviewCreateInline({ onCreated }) {
 
     setLoadingVerify(true);
     try {
-      const r = await ReviewAPI.verifyReceipt(receiptFile);
-      const ext = r.data?.extracted || null;
+      // 1. Enqueue receipt verification job
+      const enqueueRes = await ReviewAPI.verifyReceipt(receiptFile);
+      const jobId = enqueueRes.data?.job_id;
+
+      if (!jobId) {
+        throw new Error("No job_id returned from server");
+      }
+
+      setMsg("Processing receipt... Please wait.");
+
+      // 2. Poll job status until DONE or FAILED
+      const jobRes = await ReviewAPI.waitReceiptJob(jobId);
+      const status = jobRes.data?.status;
+      const ext = jobRes.data?.extracted || null;
+
+      if (status === "FAILED") {
+        const errMsg = jobRes.data?.error || "Receipt processing failed";
+        throw new Error(errMsg);
+      }
 
       const coords = ext?.coords;
       if (!coords || coords.x == null || coords.y == null) {
@@ -69,7 +86,7 @@ export default function ReviewCreateInline({ onCreated }) {
         return;
       }
 
-      setReceiptId(r.data?.receipt_id);
+      setReceiptId(jobId); // Use job_id as receipt_id
       setExtracted(ext);
 
       if (ext?.menu_en) {

@@ -1,22 +1,98 @@
+import base64
+import json
 import uuid
-from typing import List
+from pathlib import Path
+from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from backend.app.common.service.file_upload_service import ensure_local_path, upload_input_file
 from backend.app.core.database import get_db
+from backend.app.core.job_queue import connect_redis, enqueue_task, utc_now_iso
 from backend.app.core.security.deps import get_current_member
 from backend.app.common.utils.debug import log_exception
-from backend.app.features.review.schemas import ReceiptVerifyResponse, ReviewCreateResponse, ReviewContentUpdateResponse, ReviewContentUpdate, ReviewRead
+from backend.app.common.service.receipt_session_service import ReceiptSessionService
+from backend.app.features.review.schemas import (
+    ReviewEnqueueResponse,
+    ReviewJobResponse,
+    ReceiptVerifyResponse,
+    ReviewCreateResponse,
+    ReviewContentUpdateResponse,
+    ReviewContentUpdate,
+    ReviewRead,
+)
 from backend.app.features.review.service import verify_receipt, create_review_from_receipt, list_reviews, get_review_detail, update_review_content_only
 
 router = APIRouter(prefix="/review", tags=["review"])
 
-@router.post("/receipt/verify", response_model=ReceiptVerifyResponse)
+def _parse_json(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, (dict, list)):
+        return value
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except Exception:
+            return value
+    return value
+
+@router.post("/receipt/verify", response_model=ReviewEnqueueResponse, status_code=202)
 async def receipt_verify(
+    type: str = Form("receipt"),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current=Depends(get_current_member),
+):
+    """Production: 비동기 큐 기반 처리"""
+    if (type or "").lower().strip() != "receipt":
+        raise HTTPException(status_code=400, detail="type must be 'receipt'")
+
+    receipt_id = uuid.uuid4().hex
+
+    try:
+        obj = await upload_input_file(
+            upload_type="receipt",
+            member_id=current.member_id,
+            upload=file,
+            scope_id=receipt_id,
+            is_temp=True,
+        )
+    except Exception as e:
+        log_exception("review.upload_input", e)
+        raise HTTPException(status_code=400, detail=f"upload failed: {e}")
+
+    local_path, cleanup = ensure_local_path(obj)
+
+    try:
+        image_b64 = base64.b64encode(Path(local_path).read_bytes()).decode("ascii")
+
+        payload: Dict[str, Any] = {
+            "receipt_id": receipt_id,
+            "image_base64": image_b64,
+        }
+
+        try:
+            r = connect_redis()
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"redis unavailable: {type(e).__name__}: {e}")
+
+        enqueue_task(r, task="review_receipt_ocr", payload=payload, job_id=receipt_id)
+        return ReviewEnqueueResponse(job_id=receipt_id, status="PENDING", queued_at=utc_now_iso())
+    except Exception as e:
+        log_exception("router.receipt_verify", e)
+        raise HTTPException(status_code=500, detail=f"review enqueue failed: {type(e).__name__}: {e}")
+    finally:
+        cleanup()
+
+
+@router.post("/receipt/verify/sync", response_model=ReceiptVerifyResponse)
+async def receipt_verify_sync(
     type: str = Form("receipt"),
     file: UploadFile = File(...),
     current=Depends(get_current_member),
 ):
+    """Local 개발: 동기식 즉시 처리"""
     if (type or "").lower().strip() != "receipt":
         raise HTTPException(status_code=400, detail="type must be 'receipt'")
 
@@ -26,10 +102,8 @@ async def receipt_verify(
         out = await verify_receipt(member_id=current.member_id, file=file, receipt_id=receipt_id)
         return ReceiptVerifyResponse(receipt_id=out["receipt_id"], extracted=out.get("final") or {})
     except Exception as e:
-        log_exception("router.receipt_verify", e)
-        raise HTTPException(status_code=500, detail=f"review enqueue failed: {type(e).__name__}: {e}")
-    finally:
-        cleanup()
+        log_exception("router.receipt_verify_sync", e)
+        raise HTTPException(status_code=500, detail=f"receipt verification failed: {type(e).__name__}: {e}")
 
 
 @router.get("/receipt/job/{job_id}", response_model=ReviewJobResponse)

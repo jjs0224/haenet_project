@@ -1,18 +1,26 @@
 import api from "./axiosInstance";
 
 export const ReviewAPI = {
-    //  영수증 검증
+    //  영수증 검증 (Production: 비동기 큐 기반)
     verifyReceipt: (file) => {
         const fd = new FormData();
         fd.append("type", "receipt");
         fd.append("file", file);
-
-        // ✅ Content-Type 직접 지정하지 말기(axios가 boundary 포함 자동 설정)
         return api.post("/review/receipt/verify", fd);
     },
 
+    //  영수증 검증 (Local: 동기식 즉시 처리)
+    verifyReceiptSync: (file) => {
+        const fd = new FormData();
+        fd.append("type", "receipt");
+        fd.append("file", file);
+        return api.post("/review/receipt/verify/sync", fd);
+    },
+
+    //  작업 상태 조회
     getReceiptJob: (jobId) => api.get(`/review/receipt/job/${jobId}`),
 
+    //  작업 완료까지 폴링
     waitReceiptJob: async (jobId, opts = {}) => {
         const intervalMs = opts.intervalMs ?? 2000;
         const maxAttempts = opts.maxAttempts ?? 90;
