@@ -16,13 +16,13 @@ spec:
       chart: redis
       targetRevision: 24.1.0
       helm:
-        releaseName: redis-dev
+        releaseName: redis
         valueFiles:
           - $values/k8s/env/dev/redis-values.yaml
 
     # Source 2: Values from your Git repo
-    - repoURL: https://github.com/jjs0224/haenet_project
-      targetRevision: development
+    - repoURL: https://github.com/mingoo684/cicdex2.git
+      targetRevision: test1
       ref: values
 
   syncPolicy:
@@ -31,5 +31,3 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-
-

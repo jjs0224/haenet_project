@@ -26,42 +26,10 @@ JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "14"))
 
-# ---- Auth Cookies ----
-_cookie_domain = os.getenv("COOKIE_DOMAIN", "").strip()
-COOKIE_DOMAIN = _cookie_domain if _cookie_domain else None
-COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").strip().lower() in ("1", "true", "yes", "y")
-COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "none").strip().lower()
-if COOKIE_SAMESITE not in ("lax", "strict", "none"):
-    COOKIE_SAMESITE = "lax"
-
 # ---- Redis ----
-REDIS_URL = os.getenv("REDIS_URL", "").strip()
-if REDIS_URL:
-    try:
-        from urllib.parse import urlparse
-
-        parsed = urlparse(REDIS_URL)
-        if parsed.scheme in ("redis", "rediss"):
-            REDIS_HOST = parsed.hostname or "127.0.0.1"
-            REDIS_PORT = parsed.port or 6379
-            REDIS_DB = int(parsed.path.lstrip("/") or 0)
-        else:
-            raise ValueError(f"Unsupported REDIS_URL scheme: {parsed.scheme}")
-    except Exception:
-        # Fallback to explicit env vars if parsing fails
-        REDIS_HOST = os.getenv("REDIS_HOST", "127.0.0.1")
-        port_raw = os.getenv("REDIS_PORT", "6379")
-        if port_raw.startswith("tcp://"):
-            port_raw = port_raw.rsplit(":", 1)[-1]
-        REDIS_PORT = int(port_raw)
-        REDIS_DB = int(os.getenv("REDIS_DB", "0"))
-else:
-    REDIS_HOST = os.getenv("REDIS_HOST", "127.0.0.1")
-    port_raw = os.getenv("REDIS_PORT", "6379")
-    if port_raw.startswith("tcp://"):
-        port_raw = port_raw.rsplit(":", 1)[-1]
-    REDIS_PORT = int(port_raw)
-    REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+REDIS_HOST = os.getenv("REDIS_HOST", "127.0.0.1")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 
 # ---- Project Root ----
 PROJECT_ROOT = Path(__file__).resolve().parents[3]

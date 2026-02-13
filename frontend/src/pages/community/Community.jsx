@@ -6,7 +6,7 @@ import CreateModal from "../../components/community/CreateModal";
 import { AuthContext } from "../../context/AuthContext";
 import { CommunityContext } from "../../context/CommunityContext";
 import { ReviewContext } from "../../context/ReviewContext";
-import { safeLocal } from "../../utils/storage";
+// import ReviewProgress from "../../components/review/ReviewProgress";
 
 export default function Community() {
   const nav = useNavigate();
@@ -44,9 +44,9 @@ export default function Community() {
       });
 
       if (templateId === 2 && result?.image_urls?.length > 0) {
-        safeLocal.set("foodmap_image_url", result.image_urls[0]);
+        localStorage.setItem("foodmap_image_url", result.image_urls[0]);
         if (result.community_id) {
-          safeLocal.set("foodmap_community_id", String(result.community_id));
+          localStorage.setItem("foodmap_community_id", String(result.community_id));
         }
         window.dispatchEvent(new Event("foodmap-updated"));
       }

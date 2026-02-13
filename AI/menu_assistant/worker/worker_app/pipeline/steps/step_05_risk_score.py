@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from menu_assistant.worker.worker_app.llm.services.halal_rules import normalize_user_profile
+
 def _read_json(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
@@ -62,7 +62,7 @@ def _load_cache(path: Path) -> Dict[str, Any]:
         return {}
     try:
         obj = json.loads(path.read_text(encoding="utf-8"))
-        return normalize_user_profile(obj) if isinstance(obj, dict) else {}
+        return obj if isinstance(obj, dict) else {}
     except Exception:
         return {}
 
@@ -164,7 +164,7 @@ def _profile_categories_to_minimal(obj: Dict[str, Any]) -> Dict[str, Any]:
 
 def _load_user_profile(user_profile_json: str) -> Dict[str, Any]:
     if not user_profile_json:
-        return normalize_user_profile({"allergy_tags": [], "avoid_foods": [], "religion": None})
+        return {"allergy_tags": [], "avoid_foods": [], "religion": None}
 
     p = Path(user_profile_json)
     if not p.exists():
@@ -182,13 +182,13 @@ def _load_user_profile(user_profile_json: str) -> Dict[str, Any]:
         obj.setdefault("allergy_tags", [])
         obj.setdefault("avoid_foods", [])
         obj.setdefault("religion", None)
-        return normalize_user_profile(obj)
+        return obj
 
     converted = _profile_categories_to_minimal(obj)
     if isinstance(converted, dict) and set(converted.keys()) >= {"allergy_tags", "avoid_foods", "religion"}:
-        return normalize_user_profile(converted)
+        return converted
 
-    return normalize_user_profile({"allergy_tags": [], "avoid_foods": [], "religion": None})
+    return {"allergy_tags": [], "avoid_foods": [], "religion": None}
 
 
 # -------------------------
@@ -418,13 +418,11 @@ def _call_llm_for_chunk(
     from menu_assistant.worker.worker_app.llm.prompt_builder import build_step05_prompt
     from menu_assistant.worker.worker_app.llm.client import Gemini25FlashClient
     from menu_assistant.worker.worker_app.llm.parsers import (
-        parse_and_validate_llm_patch_output,   # ✅ patch parser
+        parse_and_validate_llm_output,
         build_retry_prompt_from_error,
         LLMParseError,
     )
-    from menu_assistant.worker.worker_app.llm.services.schema import (
-        validate_llm_patch_output_against_input_ids,
-    )
+    from menu_assistant.worker.worker_app.llm.services.schema import validate_llm_output_against_input_ids
 
     expected_ids = [it["item_id"] for it in items_chunk]
 
@@ -449,46 +447,21 @@ def _call_llm_for_chunk(
             _write_text(llm_dir / f"llm_raw.chunk{chunk_index:03d}.txt", raw)
 
         try:
-            # ✅ 1) patch 출력 파싱/검증
-            obj = parse_and_validate_llm_patch_output(raw)
+            obj = parse_and_validate_llm_output(raw)
 
-            # ✅ 2) patch 모드 fallback fill (minimal schema 기준)
+            # fallback fill (same as your current logic)
             items_out = obj.get("items", []) or []
             for it in items_out:
                 if not isinstance(it, dict):
                     continue
+                if not str(it.get("menu_description_ko") or "").strip():
+                    it["menu_description_ko"] = "메뉴 설명 정보가 제한적입니다. 주문 전 구성 재료를 확인하세요."
+                if not str(it.get("risk_description_ko") or "").strip():
+                    it["risk_description_ko"] = "사용자 알러지/종교/기피 식품과의 충돌 가능성이 있어 주문 전 재료 확인이 필요합니다."
+                if not str(it.get("comment_ko") or "").strip():
+                    it["comment_ko"] = "이 메뉴에 알러지 유발 성분이나 기피 식품이 포함되나요?"
 
-                is_menu = str(it.get("is_menu") or "").strip().lower()
-
-                # menu=yes일 때는 텍스트 3종 필수 (없으면 보수적 기본값)
-                if is_menu != "no":
-                    if not str(it.get("menu_description_ko") or "").strip():
-                        it["menu_description_ko"] = "메뉴 설명 정보가 제한적입니다. 주문 전 구성 재료(소스/육수/토핑 포함)를 확인하세요."
-                    if not str(it.get("risk_description_ko") or "").strip():
-                        it["risk_description_ko"] = "사용자 알러지/종교/기피 식품과의 충돌 가능성이 있어 주문 전 재료 확인이 필요합니다."
-                    if not str(it.get("comment_ko") or "").strip():
-                        it["comment_ko"] = "이 메뉴(또는 소스/육수)에 알러지 유발 성분이나 기피/종교 제한 성분이 들어가나요? (Yes/No)"
-                else:
-                    # menu=no일 때 drop_reason_ko 필수
-                    if not str(it.get("drop_reason_ko") or "").strip():
-                        it["drop_reason_ko"] = "메뉴 항목이 아닌 것으로 판단됨"
-
-                # user_risk_match 최소 구조 보정(없으면 생성)
-                urm = it.get("user_risk_match")
-                if not isinstance(urm, dict):
-                    urm = {}
-                urm.setdefault("allergy_tag_hits", None)
-                urm.setdefault("religion_hit", None)
-                urm.setdefault("avoid_food_hits", None)
-                urm.setdefault("has_any_match", False)
-                urm.setdefault("source", "unknown")
-                it["user_risk_match"] = urm
-
-                # match_status는 항상 unknown
-                it["match_status"] = "unknown"
-
-            # ✅ 3) item_id 1:1 대응 검사 (patch 버전)
-            ok_ids, msg_ids = validate_llm_patch_output_against_input_ids(obj, expected_ids)
+            ok_ids, msg_ids = validate_llm_output_against_input_ids(obj, expected_ids)
             if not ok_ids:
                 raise LLMParseError(msg_ids)
 
@@ -496,15 +469,13 @@ def _call_llm_for_chunk(
             if cache is not None and cache_key:
                 cache[cache_key] = obj
 
-            return normalize_user_profile(obj)
+            return obj
 
         except Exception as e:
             last_err = str(e)
             if attempt >= max_retries:
                 break
-
-            # ✅ patch 모드 retry 프롬프트
-            user_msg = user_msg_base + "\n\n" + build_retry_prompt_from_error(last_err, mode="patch")
+            user_msg = user_msg_base + "\n\n" + build_retry_prompt_from_error(last_err)
 
     raise RuntimeError(f"[STEP05] chunk={chunk_index} invalid after retries. last_error={last_err}")
 

@@ -3,8 +3,8 @@
 replicaCount: 1
 
 image:
-    repository: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-api
-    tag: prod-001
+    repository: 624280434939.dkr.ecr.ap-northeast-2.amazonaws.com/projecta-api
+    tag: dev-001
     pullPolicy: IfNotPresent
 
 # GHCR private/권한 이슈가 있으면 사용
@@ -12,20 +12,24 @@ imagePullSecrets: []
 
 env:
     APP_ENV: dev
-    STORAGE_BACKEND: local
-    LOCAL_UPLOAD_ROOT: /app/uploads
     DB_HOST: project-prod-db.c7oeqq6c6a58.ap-northeast-2.rds.amazonaws.com
     DB_PORT: "3306"
     DB_NAME: app_db
     DB_USER: app_user
-    REDIS_URL: "redis://redis-master:6379/0"
+    REDIS_URL: "redis://redis:6379/0"
     QUEUE_NAME_MENU_ASSISTANT: "cicdex:jobs:menu_assistant"
     QUEUE_NAME_JOURNAL: "cicdex:jobs:journal"
     QUEUE_NAME_REVIEW: "cicdex:jobs:review"
 
 # Secret을 "파일 마운트"로 주입하는 구조
+secretsMount:
+    enabled: true
+    mountPath: /run/app-secrets
+    dbPasswordKey: db_password
+    jwtSecretKeyKey: jwt_secret_key
+
 secret:
-    enabled: false
+    enabled: true
     dbPassword: DEV_DB_PASSWORD_CHANGE_ME
     jwtSecretKey: DEV_JWT_CHANGE_ME
 

@@ -192,7 +192,7 @@ export default function PolygonOverlay({ items, imgSize, onSelectItem }) {
               points={points}
               style={{
                 stroke,
-                fill: hexToRgba(stroke, 0.16), // 내부 연하게 고정
+                fill: hexToRgba(stroke, 0.84), // 내부 연하게 고정
                 strokeWidth: 3,                // 테두리 진하게
                 strokeOpacity: 0.95,
                 fillOpacity: 1,

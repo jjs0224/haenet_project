@@ -1,63 +1,65 @@
 replicaCount: 1
 
 serviceAccount:
-    create: true
-    name: ""
-    annotations: {}
-    automount: true
+  create: true
+  name: ""
+  annotations: {}
 
 autoscaling:
-    enabled: false
-    minReplicas: 1
-    maxReplicas: 2
-    targetCPUUtilizationPercentage: 80
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 80
+
 
 image:
-    repository: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-api
-    tag: dev-006
-    pullPolicy: IfNotPresent
+  repository: ghcr.io/mingoo684/cicdex2-api
+  tag: dev-006
+  pullPolicy: IfNotPresent
 
 imagePullSecrets: []
 
 service:
-    type: ClusterIP
-    port: 8000
+  type: ClusterIP
+  port: 8000
 
 ingress:
-    enabled: false
-    className: nginx
-    host: app.local
-    path: /api(/|$)(.*)
-    pathType: ImplementationSpecific
-    annotations: {}
+  enabled: false
+  className: nginx
+  host: app.local
+  path: /api(/|$)(.*)
+  pathType: ImplementationSpecific
 
 httpRoute:
-    enabled: false
+  enabled: false
+
 
 resources: {}
 
 env:
-    APP_ENV: "dev"
-    DB_HOST: "database-1.c7oeqq6c6a58.ap-northeast-2.rds.amazonaws.com"
-    DB_PORT: "3306"
-    DB_NAME: "app_db"
-    DB_USER: "app_user"
-    REDIS_URL: "redis://redis-master:6379/0"
-    QUEUE_NAME_MENU_ASSISTANT: "cicdex:jobs:menu_assistant"
-    QUEUE_NAME_JOURNAL: "cicdex:jobs:journal"
-    QUEUE_NAME_REVIEW: "cicdex:jobs:review"
+  APP_ENV: "dev"
+  DB_HOST: "database-1.c7oeqq6c6a58.ap-northeast-2.rds.amazonaws.com"
+  DB_PORT: "3306"
+  DB_NAME: "app_db"
+  DB_USER: "app_user"
+  REDIS_URL: "redis://redis:6379/0"
+  QUEUE_NAME_MENU_ASSISTANT: "cicdex:jobs:menu_assistant"
+  QUEUE_NAME_JOURNAL: "cicdex:jobs:journal"
+  QUEUE_NAME_REVIEW: "cicdex:jobs:review"
 
 secret:
-    enabled: false
-    # DEV에서는 임시로 plaintext secret을 둘 수 있으나,
-    # 운영(EKS)에서는 External Secrets로 전환 권장
-    dbPassword: "CHANGE_ME"
-    jwtSecretKey: "CHANGE_ME"
+  enabled: true
+  # DEV에서는 임시로 plaintext secret을 둘 수 있으나,
+  # 운영(EKS)에서는 External Secrets로 전환 권장
+  dbPassword: "CHANGE_ME"
+  jwtSecretKey: "CHANGE_ME"
 
-# NOTE:
-# - When using External Secrets, keep secret.enabled=false
-# - Secrets are injected via envFrom secretRef in the deployment
+secretsMount:
+  enabled: true
+  mountPath: /run/app-secrets
+  dbPasswordKey: db_password
+  jwtSecretKeyKey: jwt_secret_key
 
 probes:
-    readinessPath: /health
-    livenessPath: /health
+  readinessPath: /health
+  livenessPath: /health

@@ -3,11 +3,9 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Dict
+from typing import Any, Dict, Tuple, Optional
 
-from menu_assistant.worker.worker_app.llm.services.schema import (
-    validate_llm_patch_output_v1,
-)
+from menu_assistant.worker.worker_app.llm.services.schema import validate_llm_output_v1
 
 
 _JSON_BLOCK_RE = re.compile(r"\{.*\}", re.DOTALL)
@@ -18,6 +16,11 @@ class LLMParseError(Exception):
 
 
 def extract_json_object(text: str) -> Dict[str, Any]:
+    """
+    Extract a JSON object from raw text.
+    - If the model outputs pure JSON, json.loads will work.
+    - If extra text exists, try to find the largest {...} block.
+    """
     text = (text or "").strip()
     if not text:
         raise LLMParseError("empty response")
@@ -46,27 +49,7 @@ def extract_json_object(text: str) -> Dict[str, Any]:
     return obj
 
 
-def build_retry_prompt_from_error(err_msg: str, *, mode: str = "full") -> str:
-    if mode == "patch":
-        return (
-            "Your previous output was invalid.\n"
-            f"Validation error: {err_msg}\n"
-            "Return ONLY valid JSON with required keys.\n"
-            "Root required keys: schema_version, run_id, items\n"
-            "Each items[*] REQUIRED keys:\n"
-            "- item_id\n"
-            "- match_status (must be 'unknown')\n"
-            "- is_menu (yes|no)\n"
-            "- drop_reason_ko (required if is_menu=='no')\n"
-            "- menu_description_ko (non-empty if is_menu=='yes')\n"
-            "- risk_description_ko (non-empty if is_menu=='yes')\n"
-            "- comment_ko (non-empty question ending with '?', if is_menu=='yes')\n"
-            "- user_risk_match (keys: allergy_tag_hits, religion_hit, avoid_food_hits, has_any_match, source='unknown')\n"
-            "Optional: menu_name_ko\n"
-            "Do NOT include markdown or extra text.\n"
-        )
-
-    # legacy full mode
+def build_retry_prompt_from_error(err_msg: str) -> str:
     return (
         "Your previous output was invalid.\n"
         f"Validation error: {err_msg}\n"
@@ -92,21 +75,13 @@ def build_retry_prompt_from_error(err_msg: str, *, mode: str = "full") -> str:
     )
 
 
+
 def parse_and_validate_llm_output(raw_text: str) -> Dict[str, Any]:
     obj = extract_json_object(raw_text)
     ok, msg = validate_llm_output_v1(obj)
     if not ok:
         raise LLMParseError(msg)
-    if obj.get("schema_version") is None:
-        obj["schema_version"] = "v1"
-    return obj
-
-
-def parse_and_validate_llm_patch_output(raw_text: str) -> Dict[str, Any]:
-    obj = extract_json_object(raw_text)
-    ok, msg = validate_llm_patch_output_v1(obj)
-    if not ok:
-        raise LLMParseError(msg)
+    # normalize schema_version default
     if obj.get("schema_version") is None:
         obj["schema_version"] = "v1"
     return obj

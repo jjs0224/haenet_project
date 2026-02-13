@@ -1,6 +1,5 @@
 import React, { createContext, useEffect, useMemo, useReducer } from "react";
 import { MetaAPI } from "../api/metaApi";
-import { safeLocal } from "../utils/storage";
 
 export const MetaContext = createContext(null);
 
@@ -41,7 +40,7 @@ export function MetaProvider({ children }) {
 
         // ✅ localStorage 캐시 (ReviewDetail에서 읽을 수 있게)
         try {
-          safeLocal.set("meta_categories", JSON.stringify(list));
+          localStorage.setItem("meta_categories", JSON.stringify(list));
         } catch {}
       } catch (e) {
         dispatch({ type: "LOAD_ERR", error: e?.response?.data?.detail || e?.message });

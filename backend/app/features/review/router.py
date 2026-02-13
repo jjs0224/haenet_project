@@ -1,48 +1,20 @@
-import base64
-import json
 import uuid
-from pathlib import Path
-from typing import Any, Dict, List
-from sqlalchemy import select
+from typing import List
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from backend.app.common.service.file_upload_service import ensure_local_path, upload_input_file
 from backend.app.core.database import get_db
-from backend.app.core.job_queue import connect_redis, enqueue_task, utc_now_iso
 from backend.app.core.security.deps import get_current_member
 from backend.app.common.utils.debug import log_exception
-from backend.app.common.service.receipt_session_service import ReceiptSessionService
-from backend.app.features.review.schemas import (
-    ReviewEnqueueResponse,
-    ReviewJobResponse,
-    ReviewCreateResponse,
-    ReviewContentUpdateResponse,
-    ReviewContentUpdate,
-    ReviewRead,
-)
-from backend.app.features.review.service import create_review_from_receipt, list_reviews, get_review_detail, update_review_content_only
+from backend.app.features.review.schemas import ReceiptVerifyResponse, ReviewCreateResponse, ReviewContentUpdateResponse, ReviewContentUpdate, ReviewRead
+from backend.app.features.review.service import verify_receipt, create_review_from_receipt, list_reviews, get_review_detail, update_review_content_only
 
 router = APIRouter(prefix="/review", tags=["review"])
 
-def _parse_json(value: Any) -> Any:
-    if value is None:
-        return None
-    if isinstance(value, (dict, list)):
-        return value
-    if isinstance(value, str):
-        try:
-            return json.loads(value)
-        except Exception:
-            return value
-    return value
-
-
-@router.post("/receipt/verify", response_model=ReviewEnqueueResponse, status_code=202)
+@router.post("/receipt/verify", response_model=ReceiptVerifyResponse)
 async def receipt_verify(
     type: str = Form("receipt"),
     file: UploadFile = File(...),
-    db: Session = Depends(get_db),
     current=Depends(get_current_member),
 ):
     if (type or "").lower().strip() != "receipt":
@@ -51,34 +23,8 @@ async def receipt_verify(
     receipt_id = uuid.uuid4().hex
 
     try:
-        obj = await upload_input_file(
-            upload_type="receipt",
-            member_id=current.member_id,
-            upload=file,
-            scope_id=receipt_id,
-            is_temp=True,
-        )
-    except Exception as e:
-        log_exception("review.upload_input", e)
-        raise HTTPException(status_code=400, detail=f"upload failed: {e}")
-
-    local_path, cleanup = ensure_local_path(obj)
-
-    try:
-        image_b64 = base64.b64encode(Path(local_path).read_bytes()).decode("ascii")
-
-        payload: Dict[str, Any] = {
-            "receipt_id": receipt_id,
-            "image_base64": image_b64,
-        }
-
-        try:
-            r = connect_redis()
-        except Exception as e:
-            raise HTTPException(status_code=503, detail=f"redis unavailable: {type(e).__name__}: {e}")
-
-        enqueue_task(r, task="review_receipt_ocr", payload=payload, job_id=receipt_id)
-        return ReviewEnqueueResponse(job_id=receipt_id, status="PENDING", queued_at=utc_now_iso())
+        out = await verify_receipt(member_id=current.member_id, file=file, receipt_id=receipt_id)
+        return ReceiptVerifyResponse(receipt_id=out["receipt_id"], extracted=out.get("final") or {})
     except Exception as e:
         log_exception("router.receipt_verify", e)
         raise HTTPException(status_code=500, detail=f"review enqueue failed: {type(e).__name__}: {e}")
@@ -198,5 +144,3 @@ def review_update_content(
         current_role=getattr(current, "role", None),
         new_content=payload.review_content,
     )
-
-# CI/CD Test3

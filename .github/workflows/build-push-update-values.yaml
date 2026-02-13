@@ -1,185 +1,210 @@
 name: build-push-update-values
 
 on:
-  pull_request:
-    branches: [development]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - "AI/**"
-      - "docker/**"
-      - "requirements*.txt"
-      - ".github/workflows/**"
-  push:
-    branches: [main, development]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - "AI/**"
-      - "docker/**"
-      - "requirements*.txt"
-      - ".github/workflows/**"
-  workflow_dispatch:
+    pull_request:
+        paths-ignore:
+            - "k8s/env/**"
+
+    push:
+        branches: ["main"]
+        paths-ignore:
+            - "k8s/env/**"
 
 permissions:
-  contents: write
-  packages: write
+    contents: write
+    packages: write
 
 env:
-  AWS_REGION: ap-northeast-2
-  REGISTRY: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com
-  API_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-api
-  FRONTEND_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-frontend
-  WORKER_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-worker-gpu
-  # 베이스 이미지 (requirements/dependencies가 변경되지 않으면 재사용)
-  BACKEND_BASE_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-backend-base:latest
-  WORKER_BASE_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-worker-base:latest
-  FRONTEND_BASE_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-frontend-base:latest
+    AWS_REGION: ap-northeast-2
+    REGISTRY: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com
+    API_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-api
+    FRONTEND_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-frontend
+    WORKER_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-worker-gpu
+    # 베이스 이미지 (requirements/dependencies가 변경되지 않으면 재사용)
+    BACKEND_BASE_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-backend-base:latest
+    WORKER_BASE_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-worker-base:latest
+    FRONTEND_BASE_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-frontend-base:latest
 
 jobs:
-  build-and-push:
-    name: build & push images
-    runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'push' ||
-      (github.event_name == 'pull_request' &&
-       github.event.pull_request.base.ref == 'development' &&
-       github.event.pull_request.head.repo.full_name == github.repository)
-    outputs:
-      tag: ${{ steps.tag.outputs.tag }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    verify:
+        name: verify (build only)
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo docker system prune -af
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: ${{ env.AWS_REGION }}
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+            - name: Login to ECR
+              uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Login to ECR
-        uses: aws-actions/amazon-ecr-login@v2
+            - name: Set tag
+              id: tag
+              shell: bash
+              run: |
+                  if [ "${{ github.event_name }}" = "pull_request" ]; then
+                    echo "tag=pr-${{ github.event.pull_request.number }}-sha-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "tag=sha-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+                  fi
 
-      - name: Set tag
-        id: tag
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "tag=pr-${{ github.event.pull_request.number }}-sha-${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=sha-${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          fi
+            - name: Pull backend base image
+              run: docker pull ${{ env.BACKEND_BASE_IMAGE }} || echo "Base image not found, will use fallback build"
 
-      - name: Pull backend base image
-        run: docker pull ${{ env.BACKEND_BASE_IMAGE }} || echo "Base image not found, will use fallback build"
+            - name: Build & Push (API)
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: docker/backend.Dockerfile
+                  push: true
+                  tags: |
+                      ${{ env.API_IMAGE }}:${{ steps.tag.outputs.tag }}
+                  build-args: |
+                      BASE_IMAGE=${{ env.BACKEND_BASE_IMAGE }}
+                      REQUIREMENTS=requirements_api.txt
+                  cache-from: type=gha,scope=backend-app
+                  cache-to: type=gha,mode=max,scope=backend-app
 
-      - name: Build & Push (API)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/backend.Dockerfile
-          push: true
-          tags: |
-            ${{ env.API_IMAGE }}:${{ steps.tag.outputs.tag }}
-          build-args: |
-            BASE_IMAGE=${{ env.BACKEND_BASE_IMAGE }}
-            REQUIREMENTS=requirements_api.txt
-          cache-from: type=gha,scope=backend-app
-          cache-to: type=gha,mode=max,scope=backend-app
+            - name: Pull frontend base image
+              run: docker pull ${{ env.FRONTEND_BASE_IMAGE }} || echo "Base image not found, will use fallback build"
 
-      - name: Pull frontend base image
-        run: docker pull ${{ env.FRONTEND_BASE_IMAGE }} || echo "Base image not found, will use fallback build"
+            - name: Verify build (Worker)
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: docker/frontend.Dockerfile
+                  push: true
+                  tags: |
+                      ${{ env.FRONTEND_IMAGE }}:${{ steps.tag.outputs.tag }}
+                  build-args: |
+                      BASE_IMAGE=${{ env.FRONTEND_BASE_IMAGE }}
+                      REACT_APP_API_BASE_URL=https://api.foodray.net
+                  cache-from: type=gha,scope=frontend-app
+                  cache-to: type=gha,mode=max,scope=frontend-app
 
-      - name: Build & Push (Frontend)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/frontend.Dockerfile
-          push: true
-          tags: |
-            ${{ env.FRONTEND_IMAGE }}:${{ steps.tag.outputs.tag }}
-          build-args: |
-            BASE_IMAGE=${{ env.FRONTEND_BASE_IMAGE }}
-            REACT_APP_API_BASE_URL=https://api.foodray.net
-          cache-from: type=gha,scope=frontend-app
-          cache-to: type=gha,mode=max,scope=frontend-app
+            - name: Pull worker base image
+              run: docker pull ${{ env.WORKER_BASE_IMAGE }} || echo "Base image not found, will use fallback build"
 
-      - name: Pull worker base image
-        run: docker pull ${{ env.WORKER_BASE_IMAGE }} || echo "Base image not found, will use fallback build"
+            - name: Verify build (Frontend)
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: docker/worker.Dockerfile
+                  push: true
+                  tags: |
+                      ${{ env.WORKER_IMAGE }}:${{ steps.tag.outputs.tag }}
+                  build-args: |
+                      BASE_IMAGE=${{ env.WORKER_BASE_IMAGE }}
+                      WORKER_REQUIREMENTS=requirements_cu.txt
+                      PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu126
+                  cache-from: type=gha,scope=worker-app
+                  cache-to: type=gha,mode=max,scope=worker-app
 
-      - name: Build & Push (Worker GPU)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/worker.Dockerfile
-          push: true
-          tags: |
-            ${{ env.WORKER_IMAGE }}:${{ steps.tag.outputs.tag }}
-          build-args: |
-            BASE_IMAGE=${{ env.WORKER_BASE_IMAGE }}
-            WORKER_REQUIREMENTS=requirements_cu.txt
-            PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu126
-          cache-from: type=gha,scope=worker-app
-          cache-to: type=gha,mode=max,scope=worker-app
+    build-push-and-bump-dev:
+        name: build & push images, bump dev values
+        runs-on: ubuntu-latest
+        needs: verify
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
-  bump-prod-values:
-    name: bump prod values
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    if: github.event_name == 'push' && github.ref == 'refs/heads/development'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
-      - name: Update prod values tags
-        run: |
-          python - <<'PY'
-          import pathlib, re
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
 
-          tag = "${{ needs.build-and-push.outputs.tag }}"
-          files = [
-            pathlib.Path("k8s/env/prod/api-values.yaml"),
-            pathlib.Path("k8s/env/prod/frontend-values.yaml"),
-            pathlib.Path("k8s/env/prod/worker-menu-assistant-values.yaml"),
-            pathlib.Path("k8s/env/prod/worker-journal-values.yaml"),
-            pathlib.Path("k8s/env/prod/worker-review-values.yaml"),
-          ]
+            - name: Login to GHCR
+              uses: docker/login-action@v3
+              with:
+                  registry: ${{ env.REGISTRY }}
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
 
-          for p in files:
-            if not p.exists():
-              raise SystemExit(f"values file not found: {p}")
+            - name: Build & Push (API api-final)
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: backend/Dockerfile
+                  target: api-final
+                  push: true
+                  tags: |
+                      ${{ env.API_IMAGE }}:${{ env.TAG }}
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
 
-            s = p.read_text(encoding="utf-8")
-            s2 = re.sub(r'(?m)^(\s*tag:\s*).*$',
-                        r'\g<1>"' + tag + r'"', s, count=1)
+            - name: Build & Push (Worker runtime)
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: backend/Dockerfile.worker
+                  target: runtime
+                  push: true
+                  tags: |
+                      ${{ env.WORKER_IMAGE }}:${{ env.TAG }}
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
 
-            if s2 == s:
-              raise SystemExit(f"tag field not found to replace in {p}")
+            - name: Build & Push (Frontend final)
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: frontend/Dockerfile
+                  target: final
+                  push: true
+                  tags: |
+                      ${{ env.FRONTEND_IMAGE }}:${{ env.TAG }}
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
 
-            p.write_text(s2, encoding="utf-8")
-            print("Updated:", p)
-          PY
+            - name: Update dev values tags (api/frontend/worker)
+              run: |
+                  python - <<'PY'
+                  import pathlib, re
 
-      - name: Commit & push values update
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+                  tag = "sha-${{ github.sha }}"
+                  files = [
+                    pathlib.Path("k8s/env/dev/api-values.yaml"),
+                    pathlib.Path("k8s/env/dev/frontend-values.yaml"),
+                    pathlib.Path("k8s/env/dev/worker-values.yaml"),
+                  ]
 
-          git add k8s/env/prod/api-values.yaml k8s/env/prod/frontend-values.yaml k8s/env/prod/worker-menu-assistant-values.yaml k8s/env/prod/worker-journal-values.yaml k8s/env/prod/worker-review-values.yaml
-          git diff --cached --quiet && echo "No changes to commit" && exit 0
+                  for p in files:
+                    if not p.exists():
+                      raise SystemExit(f"values file not found: {p}")
 
-          git commit -m "chore(prod): bump images to ${{ needs.build-and-push.outputs.tag }} [skip ci]"
-          git push
+                    s = p.read_text(encoding="utf-8")
+
+                    # Replace the first encountered "tag:" line only
+                    s2 = re.sub(r'(?m)^(\s*tag:\s*).*$',
+                                r'\1"' + tag + r'"', s, count=1)
+
+                    if s2 == s:
+                      raise SystemExit(f"tag field not found to replace in {p}")
+
+                    if "REPLACE_ME" in s2:
+                      raise SystemExit(f"ERROR: REPLACE_ME still present after update in {p}")
+
+                    p.write_text(s2, encoding="utf-8")
+                    print("Updated:", p)
+                  PY
+
+            - name: Commit & push values update
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+                  git add k8s/env/dev/api-values.yaml k8s/env/dev/frontend-values.yaml k8s/env/dev/worker-values.yaml
+                  git diff --cached --quiet && echo "No changes to commit" && exit 0
+
+                  git commit -m "chore(dev): bump images to ${{ env.TAG }} [skip ci]"
+                  git push

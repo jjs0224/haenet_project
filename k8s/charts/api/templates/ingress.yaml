@@ -1,14 +1,16 @@
-{{- if .Values.ingress.enabled }}
+ {{- if .Values.ingress.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ include "api.fullname" . }}
   labels:
     {{- include "api.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
   annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    # NGINX Ingress에서 정규식 경로 사용
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    # /api 프리픽스를 제거해서 백엔드에는 /, /health 처럼 전달
+    # 예) /api/health -> /health
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:
@@ -22,4 +24,4 @@ spec:
                 name: {{ include "api.fullname" . }}
                 port:
                   number: {{ .Values.service.port }}
-{{- end }}
+                          {{- end }}

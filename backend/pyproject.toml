@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "projecta-backend"
+version = "0.1.0"
+description = "FastAPI backend"
+requires-python = ">=3.11"
+
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  # 아래는 예시: 당신이 실제로 쓰는 DB/ORM/마이그레이션에 맞게 조정
+  "pymysql",
+  "sqlalchemy",
+  "alembic",
+]

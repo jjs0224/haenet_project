@@ -1,49 +1,49 @@
 {
-    "proxy": "https://api.foodray.net",
-    "name": "final_project",
-    "version": "0.1.0",
-    "private": true,
-    "dependencies": {
-        "@testing-library/dom": "^10.4.1",
-        "@testing-library/jest-dom": "^6.9.1",
-        "@testing-library/react": "^16.3.1",
-        "@testing-library/user-event": "^13.5.0",
-        "axios": "^1.13.2",
-        "browser-image-compression": "^2.0.2",
-        "react": "^19.2.3",
-        "react-dom": "^19.2.3",
-        "react-router-dom": "^7.11.0",
-        "react-scripts": "5.0.1",
-        "web-vitals": "^2.1.4"
-    },
-    "scripts": {
-        "start": "react-scripts start",
-        "build": "react-scripts build",
-        "test": "react-scripts test",
-        "eject": "react-scripts eject",
-        "start:frontend": "cd frontend && npm start",
-        "start:backend": "uvicorn backend.main:app --reload",
-        "start:all": "concurrently \"npm start\" \"npm run start:backend\""
-    },
-    "eslintConfig": {
-        "extends": [
-            "react-app",
-            "react-app/jest"
-        ]
-    },
-    "browserslist": {
-        "production": [
-            ">0.2%",
-            "not dead",
-            "not op_mini all"
-        ],
-        "development": [
-            "last 1 chrome version",
-            "last 1 firefox version",
-            "last 1 safari version"
-        ]
-    },
-    "devDependencies": {
-        "concurrently": "^9.2.1"
-    }
+  "proxy": "http://localhost:8000",
+  "name": "final_project",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.1",
+    "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.13.2",
+    "browser-image-compression": "^2.0.2",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-router-dom": "^7.11.0",
+    "react-scripts": "5.0.1",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "start:frontend": "cd frontend && npm start",
+    "start:backend": "uvicorn backend.main:app --reload",
+    "start:all": "concurrently \"npm start\" \"npm run start:backend\""
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
 }

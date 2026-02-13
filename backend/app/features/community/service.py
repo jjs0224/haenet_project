@@ -22,8 +22,12 @@ from backend.app.common.service.ai_member_info import build_user_profile_payload
 # community_recommend
 from backend.app.models.community_recommend import CommunityRecommend
 
-# file upload helpers
+# ai
+from AI.journal_assistant.pipeline.orchestrator import run_orchestrator
 from backend.app.common.service.file_upload_service import save_permanent_bytes, delete_prefix, build_perm_prefix
+
+# 공통 저장(규칙은 공통에서만)
+from backend.app.common.service.file_upload_service import save_permanent_bytes
 
 
 # ---------------------------------------------------------------------
@@ -109,16 +113,9 @@ async def create_step2(db: Session, total_data: Dict[str, Any]) -> Dict[str, Any
 
     # 1) AI 호출 (이벤트루프 안막도록 threadpool)
     try:
-        # Lazy import to avoid crashing API pod when AI code is not in the API image.
-        from AI.journal_assistant.pipeline.orchestrator import run_orchestrator
         image_bytes: bytes = await run_in_threadpool(run_orchestrator, ai_payload)
         if not image_bytes:
             raise RuntimeError("AI returned empty bytes")
-    except ModuleNotFoundError as e:
-        raise HTTPException(
-            status_code=503,
-            detail="AI module not available in API image (journal_assistant)."
-        ) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI generation failed: {type(e).__name__}: {e}")
 

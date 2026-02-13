@@ -1,28 +1,26 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-    name: platform-prod
-    namespace: argocd
+  name: platform-prod
+  namespace: argocd
 spec:
-    project: app-platform
+  project: app-platform
 
-    source:
-        repoURL: https://github.com/jjs0224/haenet_project
-        targetRevision: development
-        path: k8s/charts/platform
-        helm:
-            valueFiles:
-                - ../../env/prod/platform-values.yaml
+  source:
+    repoURL: https://github.com/mingoo684/cicdex2.git
+    targetRevision: test1
+    path: k8s/charts/platform
+    helm:
+      valueFiles:
+        - ../../env/prod/platform-values.yaml
 
-    destination:
-        server: https://kubernetes.default.svc
-        namespace: app-prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: app-prod
 
-    syncPolicy:
-        automated:
-            prune: true
-            selfHeal: true
-        syncOptions:
-            - CreateNamespace=true
-
-
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -7,8 +7,8 @@ spec:
   project: app-platform
 
   source:
-    repoURL: https://github.com/jjs0224/haenet_project
-    targetRevision: development
+    repoURL: https://github.com/mingoo684/cicdex2.git
+    targetRevision: test1
     path: k8s/charts/api
     helm:
       valueFiles:
@@ -24,5 +24,3 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-
-

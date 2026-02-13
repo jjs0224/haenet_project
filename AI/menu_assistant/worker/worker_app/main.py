@@ -243,7 +243,7 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def main() -> None:
-    _load_secret_from_file("GEMINI_API_KEY")
+    _load_secret_from_file("OPENAI_API_KEY")
     _load_secret_from_file("DB_PASSWORD")
     _load_secret_from_file("JWT_SECRET_KEY")
 

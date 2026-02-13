@@ -704,7 +704,7 @@ body:has(.admin-container) {
   color: #333333;
   margin-bottom: 10px;
   padding-bottom: 6px;
-  border-bottom: 1px solid #2E7D32;
+  border-bottom: 1px solid #7d2e2e;
 }
 
 .restrictions-items-container {
@@ -749,11 +749,11 @@ body:has(.admin-container) {
   width: 14px;
   height: 14px;
   cursor: pointer;
-  accent-color: #2E7D32;
+  accent-color: #d34242;
 }
 
 .restriction-item-label.checked {
-  background: #fff3cd;
+  background: #ffcdcd;
   border-color: #dc3545;
   font-weight: 700;
   color: #dc3545;

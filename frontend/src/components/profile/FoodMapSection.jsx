@@ -2,7 +2,6 @@ import { useState, useEffect, useContext } from "react";
 import { MemberContext } from "../../context/MemberContext";
 import styles from "./Section.module.css";
 import mapStyles from "./FoodMapSection.module.css";
-import { safeLocal } from "../../utils/storage";
 
 /**
  * FoodMapSection

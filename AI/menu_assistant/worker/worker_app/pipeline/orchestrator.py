@@ -235,11 +235,6 @@ class Step6Options:
     force_menu_name_en: bool = False
 
 
-    # ✅ parallel (patched Step06)
-    max_workers: int = 4
-    parallel_singles: bool = False
-
-
 
 class PipelineOrchestrator:
     def __init__(self, runs_root: Path, data_dir: Optional[Path] = None):
@@ -543,12 +538,6 @@ class PipelineOrchestrator:
                 if step6.force_menu_name_en:
                     cmd6 += ["--force_menu_name_en"]
 
-            # ✅ Step06 parallel flags
-            if getattr(step6, "parallel_singles", False):
-                cmd6 += ["--parallel_singles"]
-            if int(getattr(step6, "max_workers", 0) or 0) > 0:
-                cmd6 += ["--max_workers", str(int(step6.max_workers))]
-
             run_cmd(cmd6, cwd=self.ai_root)
 
             ensure_exists(translate_json, "Step06 expected output missing (translate.json)")
@@ -702,10 +691,6 @@ if __name__ == "__main__":
     p.add_argument("--step6-translate-menu-name", action="store_true")
     p.add_argument("--step6-force-menu-name-en", action="store_true")
 
-    # ✅ Step06 parallel (patched)
-    p.add_argument("--step6-parallel-singles", action="store_true")
-    p.add_argument("--step6-max-workers", type=int, default=4)
-
     # ---------------- Step3 checker ----------------
     p.add_argument("--no-check", action="store_true")
     p.add_argument("--check-keywords", nargs="*", default=None)
@@ -788,9 +773,6 @@ if __name__ == "__main__":
         force_translate_all=args.step6_force_translate_all,
         translate_menu_name=args.step6_translate_menu_name,
         force_menu_name_en=args.step6_force_menu_name_en,
-        # ✅ Step06 parallel (patched)
-        parallel_singles=args.step6_parallel_singles,
-        max_workers=args.step6_max_workers,
 )
 
     orch.run(

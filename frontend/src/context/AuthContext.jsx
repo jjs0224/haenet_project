@@ -1,14 +1,13 @@
 import React, { createContext, useEffect, useReducer, useMemo, useRef } from "react";
 import { AuthAPI } from "../api/authApi";
 import { setAccessToken } from "../api/axiosInstance";
-import { safeSession } from "../utils/storage";
 
 export const AuthContext = createContext(null);
 
 const SS_KEY = "access_token";
 
 const initial = {
-  accessToken: safeSession.get(SS_KEY) || null,
+  accessToken: sessionStorage.getItem(SS_KEY) || null,
   loading: true,
   error: "",
 };
@@ -43,7 +42,7 @@ export function AuthProvider({ children }) {
         dispatch({ type: "SET_ERROR", payload: "" });
 
         // 1) 세션 토큰 우선 적용
-        const ssToken = safeSession.get(SS_KEY) || null;
+        const ssToken = sessionStorage.getItem(SS_KEY) || null;
         setAccessToken(ssToken);
         dispatch({ type: "SET_TOKEN", payload: ssToken });
 
@@ -55,7 +54,7 @@ export function AuthProvider({ children }) {
 
             if (token) {
               setAccessToken(token);
-              safeSession.set(SS_KEY, token);
+              sessionStorage.setItem(SS_KEY, token);
               dispatch({ type: "SET_TOKEN", payload: token });
             }
           } catch (e) {
@@ -79,7 +78,7 @@ export function AuthProvider({ children }) {
         }
 
         setAccessToken(token);
-        safeSession.set(SS_KEY, token);
+        sessionStorage.setItem(SS_KEY, token);
         dispatch({ type: "SET_TOKEN", payload: token });
 
         window.dispatchEvent(new Event("auth-changed"));
@@ -95,7 +94,7 @@ export function AuthProvider({ children }) {
           // ignore
         } finally {
           setAccessToken(null);
-          safeSession.remove(SS_KEY);
+          sessionStorage.removeItem(SS_KEY);
           dispatch({ type: "RESET" });
           window.dispatchEvent(new Event("auth-changed"));
         }
@@ -110,7 +109,7 @@ export function AuthProvider({ children }) {
   // 탭 동기화(선택)
   useEffect(() => {
     const sync = () => {
-      const token = safeSession.get(SS_KEY) || null;
+      const token = sessionStorage.getItem(SS_KEY) || null;
       setAccessToken(token);
       dispatch({ type: "SET_TOKEN", payload: token });
     };

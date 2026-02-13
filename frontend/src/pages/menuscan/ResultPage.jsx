@@ -40,43 +40,19 @@ export default function ResultPage() {
 
     let cancelled = false;
 
-    const run = async () => {
-      try {
-        const response = await MenuAPI.uploadMenu(file);
-        if (cancelled) return;
-
-        const jobId = response?.data?.job_id;
-        const status = response?.data?.status;
-
-        if (!jobId) {
-          throw new Error("서버에서 job_id를 받지 못했어");
-        }
-
-        if (status === "DONE" && response?.data?.result) {
+    MenuAPI.uploadMenu(file)
+      .then((response) => {
+        if (!cancelled) {
           setResult(response?.data ?? response);
-          return;
+          setLoading(false);
         }
-
-        const jobRes = await MenuAPI.waitMenuJob(jobId);
-        if (cancelled) return;
-
-        if (jobRes?.data?.status === "DONE") {
-          setResult({ job_id: jobId, result: jobRes?.data?.result });
-        } else {
-          const err = jobRes?.data?.error;
-          const errMsg = err?.message || err?.detail || JSON.stringify(err || {});
-          setError(`분석 실패: ${errMsg}`);
-        }
-      } catch (err) {
+      })
+      .catch((err) => {
         if (!cancelled) {
           setError(err?.response?.data?.detail || err?.message || "분석 실패");
+          setLoading(false);
         }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    run();
+      });
 
     return () => { cancelled = true; };
   }, [navigate]);

@@ -1,22 +1,22 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: worker-journal-dev
+  name: worker-prod
   namespace: argocd
 spec:
   project: app-platform
 
   source:
-    repoURL: https://github.com/jjs0224/haenet_project
-    targetRevision: development
+    repoURL: https://github.com/mingoo684/cicdex2.git
+    targetRevision: test1
     path: k8s/charts/worker
     helm:
       valueFiles:
-        - ../../env/dev/worker-journal-values.yaml
+        - ../../env/prod/worker-values.yaml
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: app-dev
+    namespace: app-prod
 
   syncPolicy:
     automated:
@@ -24,5 +24,3 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-
-
