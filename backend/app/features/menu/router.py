@@ -8,7 +8,11 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from backend.app.common.service.ai_member_info import build_user_profile_payload
-from backend.app.common.service.file_upload_service import ensure_local_path, upload_input_file
+from backend.app.common.service.file_upload_service import (
+    ensure_local_path,
+    save_temp_json,
+    upload_input_file,
+)
 from backend.app.common.utils.debug import log_exception
 from backend.app.core.database import get_db
 from backend.app.core.job_queue import connect_redis, enqueue_task, utc_now_iso
@@ -78,12 +82,22 @@ async def upload_menu(
                 log_exception("menu.profile_build", e)
                 profile_payload = {"allergy_tags": [], "avoid_foods": [], "religion": []}
 
+        # Save profile JSON next to input image (same temp prefix/path group).
+        # local: <tmp>/<menu>/<job_id>/user_profile.json
+        # s3:    upload/tmp/menu/<job_id>/user_profile.json
+        user_profile_file_key = save_temp_json(
+            prefix_key=obj.prefix_key,
+            file_name="user_profile.json",
+            payload=profile_payload,
+        )
+
         image_b64 = base64.b64encode(Path(local_path).read_bytes()).decode("ascii")
 
         payload = {
             "run_id": job_id,
             "image_base64": image_b64,
             "user_profile": profile_payload,
+            "user_profile_file_key": user_profile_file_key,
             "runs_root": "/tmp/ai_runs",
             "run_step4": True,
             "run_step5": True,
