@@ -8,6 +8,7 @@ on:
             - "requirements_api.txt"
             - "requirements_cpu.txt"
             - "requirements_cu.txt"
+            - "frontend/package*.json"
             - "docker/base.*.Dockerfile"
     workflow_dispatch: # 수동 실행 가능
 
@@ -19,6 +20,7 @@ env:
     ECR_REGISTRY: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com
     BACKEND_BASE_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-backend-base
     WORKER_BASE_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-worker-base
+    FRONTEND_BASE_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-frontend-base
 
 jobs:
     # ═══════════════════════════════════════════════════════════
@@ -30,6 +32,7 @@ jobs:
             backend-requirements-changed: ${{ steps.filter.outputs.backend-requirements }}
             worker-cpu-requirements-changed: ${{ steps.filter.outputs.worker-cpu-requirements }}
             worker-gpu-requirements-changed: ${{ steps.filter.outputs.worker-gpu-requirements }}
+            frontend-dependencies-changed: ${{ steps.filter.outputs.frontend-dependencies }}
         steps:
             - uses: actions/checkout@v4
               with:
@@ -48,6 +51,10 @@ jobs:
                       worker-gpu-requirements:
                         - 'requirements_cu.txt'
                         - 'docker/base.worker.Dockerfile'
+                      frontend-dependencies:
+                        - 'frontend/package.json'
+                        - 'frontend/package-lock.json'
+                        - 'docker/base.frontend.Dockerfile'
 
     # ═══════════════════════════════════════════════════════════
     # Backend 베이스 이미지 빌드
@@ -148,5 +155,50 @@ jobs:
                   echo "### ✅ Worker Base Image Built" >> $GITHUB_STEP_SUMMARY
                   echo "" >> $GITHUB_STEP_SUMMARY
                   echo "- **Image**: \`${{ env.WORKER_BASE_IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
+                  echo "- **SHA Tag**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Build Number**: \`build-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
+
+    # ═══════════════════════════════════════════════════════════
+    # Frontend 베이스 이미지 빌드
+    # ═══════════════════════════════════════════════════════════
+    build-frontend-base:
+        needs: detect-changes
+        if: needs.detect-changes.outputs.frontend-dependencies-changed == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: ${{ env.AWS_REGION }}
+
+            - name: Login to ECR
+              uses: aws-actions/amazon-ecr-login@v2
+
+            - name: Build and push frontend base image
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: ./docker/base.frontend.Dockerfile
+                  push: true
+                  tags: |
+                      ${{ env.FRONTEND_BASE_IMAGE }}:latest
+                      ${{ env.FRONTEND_BASE_IMAGE }}:${{ github.sha }}
+                      ${{ env.FRONTEND_BASE_IMAGE }}:build-${{ github.run_number }}
+                  cache-from: type=gha,scope=frontend-base
+                  cache-to: type=gha,mode=max,scope=frontend-base
+
+            - name: Summary
+              run: |
+                  echo "### ✅ Frontend Base Image Built" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Image**: \`${{ env.FRONTEND_BASE_IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
                   echo "- **SHA Tag**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
                   echo "- **Build Number**: \`build-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
