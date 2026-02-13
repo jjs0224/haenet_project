@@ -83,7 +83,6 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
 
     if task == "review_receipt_ocr":
         import base64
-        import os
         from pathlib import Path
         from AI.review.app.pipeline.orchestrator import PipelineConfig, run_pipeline
 
@@ -101,9 +100,17 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         image_path.write_bytes(img_bytes)
 
         gemini_key = os.getenv("GEMINI_API_KEY") or None
+
+        naver_id = os.getenv("NAVER_CLIENT_ID", "")
+        naver_secret = os.getenv("NAVER_CLIENT_SECRET", "")
+
+        # ✅ 값 노출 없이 존재 여부만 로그(운영 디버깅 핵심)
+        _log(f"[worker] NAVER_CLIENT_ID set={bool(naver_id)} len={len(naver_id)}")
+        _log(f"[worker] NAVER_CLIENT_SECRET set={bool(naver_secret)} len={len(naver_secret)}")
+
         naver_cfg = {
-            "NAVER_CLIENT_ID": os.getenv("NAVER_CLIENT_ID", ""),
-            "NAVER_CLIENT_SECRET": os.getenv("NAVER_CLIENT_SECRET", ""),
+            "NAVER_CLIENT_ID": naver_id,
+            "NAVER_CLIENT_SECRET": naver_secret,
         }
 
         cfg = PipelineConfig(
@@ -124,6 +131,10 @@ def main() -> None:
     _load_secret_from_file("GEMINI_API_KEY")
     _load_secret_from_file("DB_PASSWORD")
     _load_secret_from_file("JWT_SECRET_KEY")
+
+    # ✅ 추가: NAVER도 *_FILE 지원
+    _load_secret_from_file("NAVER_CLIENT_ID")
+    _load_secret_from_file("NAVER_CLIENT_SECRET")
 
     redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
     queue_name = os.getenv("QUEUE_NAME", "cicdex:jobs")

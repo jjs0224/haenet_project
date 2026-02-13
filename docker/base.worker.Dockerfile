@@ -1,24 +1,25 @@
 # syntax=docker/dockerfile:1.7
-# docker/worker.Dockerfile
-# Worker 애플리케이션 이미지 (베이스 이미지 사용)
+# docker/base.worker.Dockerfile
+# Worker용 베이스 이미지: Python 의존성 + 시스템 라이브러리 포함 (애플리케이션 코드 제외)
+# requirements_cpu.txt가 변경될 때만 재빌드 필요
 
-# BASE_IMAGE가 제공되면 베이스 이미지 사용, 아니면 멀티스테이지 빌드로 폴백
-ARG BASE_IMAGE
 ARG PYTHON_IMAGE=python:3.11-slim@sha256:db27ce7778e5f581d5d97812ee577a01a9fffbfa612c47fc521fa684e3389c9b
 
 # ═══════════════════════════════════════════════════════════
-# 폴백: 베이스 이미지가 없을 때 사용할 빌더 스테이지
+# Stage 1: 의존성 빌드 (wheel 파일 생성)
 # ═══════════════════════════════════════════════════════════
 FROM ${PYTHON_IMAGE} AS builder
 WORKDIR /build
 
+# 컴파일 도구 설치
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
-ARG WORKER_REQUIREMENTS=requirements_cpu.txt
-ARG PIP_EXTRA_INDEX_URL=""
+# GPU 버전 requirements 사용 (CI/CD와 일치시킴)
+ARG WORKER_REQUIREMENTS=requirements_cu.txt
+ARG PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu126
 
 COPY ${WORKER_REQUIREMENTS} /build/requirements.txt
 
@@ -32,11 +33,13 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     fi
 
 # ═══════════════════════════════════════════════════════════
-# 폴백: 베이스 이미지가 없을 때 사용할 런타임 스테이지
+# Stage 2: 런타임 이미지
 # ═══════════════════════════════════════════════════════════
-FROM ${PYTHON_IMAGE} AS fallback-runtime
+FROM ${PYTHON_IMAGE} AS runtime
 WORKDIR /app
 
+# OpenCV와 이미지 처리를 위한 시스템 라이브러리 설치
+# 이것들도 베이스 이미지에 포함되어 매번 설치하지 않음
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
@@ -48,21 +51,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
+# 보안을 위한 non-root 유저 생성
 RUN useradd -m -u 10001 appuser
 
+# builder 스테이지에서 컴파일된 wheel 파일들 복사
 COPY --from=builder /wheels /wheels
+
+# wheel 파일들을 설치
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir /wheels/* && rm -rf /wheels
 
-# ═══════════════════════════════════════════════════════════
-# 최종 스테이지: 베이스 이미지 또는 폴백 사용
-# ═══════════════════════════════════════════════════════════
-FROM ${BASE_IMAGE:-fallback-runtime} AS runtime
-WORKDIR /app
-
-COPY . /app
-ENV PYTHONPATH=/app
-USER appuser
-
-# Default command; overridden by Helm values (worker.command/args)
-CMD ["python", "-m", "AI.menu_assistant.worker.worker_app.main"]
+# 여기까지가 베이스 이미지!
+# 애플리케이션 코드는 포함하지 않음

@@ -97,6 +97,10 @@ def receipt_job_status(job_id: str, current=Depends(get_current_member)):
     if not data:
         raise HTTPException(status_code=404, detail="job not found")
 
+    print("receipt_job_status job_id :: ", job_id)
+    print("receipt_job_status data :: ", data)
+
+
     result = _parse_json(data.get("result"))
     error = _parse_json(data.get("error"))
     status = data.get("status", "PENDING")
@@ -134,6 +138,9 @@ async def review_create(
     imgs = images or []
     if len(imgs) > 3:
         raise HTTPException(status_code=400, detail="images max 3")
+
+
+    print("현재 review_create 진입 :: ")
 
     try:
         out = await create_review_from_receipt(

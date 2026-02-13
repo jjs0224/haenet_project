@@ -1,0 +1,152 @@
+name: build-base-images
+
+# 베이스 이미지는 requirements 파일이 변경될 때만 빌드
+on:
+    push:
+        branches: [main, development]
+        paths:
+            - "requirements_api.txt"
+            - "requirements_cpu.txt"
+            - "requirements_cu.txt"
+            - "docker/base.*.Dockerfile"
+    workflow_dispatch: # 수동 실행 가능
+
+permissions:
+    contents: read
+
+env:
+    AWS_REGION: ap-northeast-2
+    ECR_REGISTRY: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com
+    BACKEND_BASE_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-backend-base
+    WORKER_BASE_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-worker-base
+
+jobs:
+    # ═══════════════════════════════════════════════════════════
+    # 변경 감지: 어떤 requirements가 변경되었는지 확인
+    # ═══════════════════════════════════════════════════════════
+    detect-changes:
+        runs-on: ubuntu-latest
+        outputs:
+            backend-requirements-changed: ${{ steps.filter.outputs.backend-requirements }}
+            worker-cpu-requirements-changed: ${{ steps.filter.outputs.worker-cpu-requirements }}
+            worker-gpu-requirements-changed: ${{ steps.filter.outputs.worker-gpu-requirements }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 2 # 이전 커밋과 비교하기 위해
+
+            - uses: dorny/paths-filter@v3
+              id: filter
+              with:
+                  filters: |
+                      backend-requirements:
+                        - 'requirements_api.txt'
+                        - 'docker/base.backend.Dockerfile'
+                      worker-cpu-requirements:
+                        - 'requirements_cpu.txt'
+                        - 'docker/base.worker.Dockerfile'
+                      worker-gpu-requirements:
+                        - 'requirements_cu.txt'
+                        - 'docker/base.worker.Dockerfile'
+
+    # ═══════════════════════════════════════════════════════════
+    # Backend 베이스 이미지 빌드
+    # ═══════════════════════════════════════════════════════════
+    build-backend-base:
+        needs: detect-changes
+        if: needs.detect-changes.outputs.backend-requirements-changed == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: ${{ env.AWS_REGION }}
+
+            - name: Login to ECR
+              uses: aws-actions/amazon-ecr-login@v2
+
+            - name: Build and push backend base image
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: ./docker/base.backend.Dockerfile
+                  push: true
+                  tags: |
+                      ${{ env.BACKEND_BASE_IMAGE }}:latest
+                      ${{ env.BACKEND_BASE_IMAGE }}:${{ github.sha }}
+                      ${{ env.BACKEND_BASE_IMAGE }}:build-${{ github.run_number }}
+                  cache-from: type=gha,scope=backend-base
+                  cache-to: type=gha,mode=max,scope=backend-base
+
+            - name: Summary
+              run: |
+                  echo "### ✅ Backend Base Image Built" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Image**: \`${{ env.BACKEND_BASE_IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
+                  echo "- **SHA Tag**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Build Number**: \`build-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
+
+    # ═══════════════════════════════════════════════════════════
+    # Worker 베이스 이미지 빌드
+    # ═══════════════════════════════════════════════════════════
+    build-worker-base:
+        needs: detect-changes
+        if: |
+            needs.detect-changes.outputs.worker-cpu-requirements-changed == 'true' ||
+            needs.detect-changes.outputs.worker-gpu-requirements-changed == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Free disk space
+              run: |
+                  sudo rm -rf /usr/local/lib/android
+                  sudo rm -rf /usr/share/dotnet
+                  sudo rm -rf /opt/ghc
+                  sudo docker system prune -af
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: ${{ env.AWS_REGION }}
+
+            - name: Login to ECR
+              uses: aws-actions/amazon-ecr-login@v2
+
+            - name: Build and push worker base image
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: ./docker/base.worker.Dockerfile
+                  push: true
+                  tags: |
+                      ${{ env.WORKER_BASE_IMAGE }}:latest
+                      ${{ env.WORKER_BASE_IMAGE }}:${{ github.sha }}
+                      ${{ env.WORKER_BASE_IMAGE }}:build-${{ github.run_number }}
+                  build-args: |
+                      WORKER_REQUIREMENTS=requirements_cu.txt
+                      PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu126
+                  cache-from: type=gha,scope=worker-base
+                  cache-to: type=gha,mode=max,scope=worker-base
+
+            - name: Summary
+              run: |
+                  echo "### ✅ Worker Base Image Built" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Image**: \`${{ env.WORKER_BASE_IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
+                  echo "- **SHA Tag**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Build Number**: \`build-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY

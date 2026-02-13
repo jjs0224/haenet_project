@@ -31,6 +31,9 @@ env:
   API_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-api
   FRONTEND_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-frontend
   WORKER_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-worker-gpu
+  # 베이스 이미지 (requirements가 변경되지 않으면 재사용)
+  BACKEND_BASE_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-backend-base:latest
+  WORKER_BASE_IMAGE: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-worker-base:latest
 
 jobs:
   build-and-push:
@@ -77,6 +80,9 @@ jobs:
             echo "tag=sha-${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Pull backend base image
+        run: docker pull ${{ env.BACKEND_BASE_IMAGE }} || echo "Base image not found, will use fallback build"
+
       - name: Build & Push (API)
         uses: docker/build-push-action@v6
         with:
@@ -86,9 +92,10 @@ jobs:
           tags: |
             ${{ env.API_IMAGE }}:${{ steps.tag.outputs.tag }}
           build-args: |
+            BASE_IMAGE=${{ env.BACKEND_BASE_IMAGE }}
             REQUIREMENTS=requirements_api.txt
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=backend-app
+          cache-to: type=gha,mode=max,scope=backend-app
 
       - name: Build & Push (Frontend)
         uses: docker/build-push-action@v6
@@ -103,6 +110,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Pull worker base image
+        run: docker pull ${{ env.WORKER_BASE_IMAGE }} || echo "Base image not found, will use fallback build"
+
       - name: Build & Push (Worker GPU)
         uses: docker/build-push-action@v6
         with:
@@ -112,10 +122,11 @@ jobs:
           tags: |
             ${{ env.WORKER_IMAGE }}:${{ steps.tag.outputs.tag }}
           build-args: |
+            BASE_IMAGE=${{ env.WORKER_BASE_IMAGE }}
             WORKER_REQUIREMENTS=requirements_cu.txt
             PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu126
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=worker-app
+          cache-to: type=gha,mode=max,scope=worker-app
 
   bump-prod-values:
     name: bump prod values

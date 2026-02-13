@@ -24,6 +24,7 @@ k8s/env/**/.env
 *.iml
 
 # config
+.claude/
 
 
 #interpreter_packages.txt
@@ -66,3 +67,4 @@ AI/review/tmp_receipt/
 # uploads
 /uploads
 AI/**/data/chroma/
+.claude/worktrees/
