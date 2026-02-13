@@ -17,13 +17,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
-# CPU 버전 requirements 사용
-COPY requirements_cpu.txt /build/requirements.txt
+# GPU 버전 requirements 사용 (CI/CD와 일치시킴)
+ARG WORKER_REQUIREMENTS=requirements_cu.txt
+ARG PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu126
+
+COPY ${WORKER_REQUIREMENTS} /build/requirements.txt
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip && \
-    pip wheel --wheel-dir /wheels -r /build/requirements.txt
+    if [ -n "$PIP_EXTRA_INDEX_URL" ]; then \
+      pip wheel --wheel-dir /wheels -r /build/requirements.txt --extra-index-url "$PIP_EXTRA_INDEX_URL"; \
+    else \
+      pip wheel --wheel-dir /wheels -r /build/requirements.txt; \
+    fi
 
 # ═══════════════════════════════════════════════════════════
 # Stage 2: 런타임 이미지
