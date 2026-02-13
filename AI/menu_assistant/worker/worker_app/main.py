@@ -239,7 +239,7 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             "final_output_path": str(final_output_path) if final_output_path.exists() else None,
         }
 
-    raise ValueError(f"Unsupported task: {task}")(f"Unsupported task: {task}")
+    raise ValueError(f"Unsupported task: {task}")
 
 
 def main() -> None:

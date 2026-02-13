@@ -4,7 +4,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import chromadb
 from chromadb.utils import embedding_functions
@@ -99,11 +99,11 @@ def _to_similarity(distance: Optional[float]) -> float:
 
 def _parse_metadata(md: Dict[str, Any]) -> Dict[str, Any]:
     return {
-        "menu": _norm_space(str(md.get("menu", ""))),
-        "variants": _split_csv(md.get("variants", "")),
-        "ingredients_ko": _split_csv(md.get("ingredients_ko", "")),
-        "alg_tags": _split_csv(md.get("alg_tags", "")),
-        "source": _norm_space(str(md.get("source", ""))),
+        "menu": _norm_ws(str(md.get("menu", ""))),
+        "variants": _split_csv_like(md.get("variants", "")),
+        "ingredients_ko": _split_csv_like(md.get("ingredients_ko", "")),
+        "alg_tags": _split_csv_like(md.get("alg_tags", "")),
+        "source": _norm_ws(str(md.get("source", ""))),
     }
 
 
@@ -159,8 +159,8 @@ def _levenshtein(a: str, b: str) -> int:
 
 
 def jamo_similarity(a: str, b: str) -> float:
-    a = _norm_space(a)
-    b = _norm_space(b)
+    a = _norm_ws(a)
+    b = _norm_ws(b)
     if not a or not b:
         return 0.0
     ja = _hangul_to_jamo(a)
@@ -208,6 +208,11 @@ class ChromaMenuRetriever:
     def _init(self) -> None:
         if self._collection is not None:
             return
+
+        if self.chroma_dir is None:
+            raise RuntimeError(
+                f"[RAG] {ENV_CHROMA_DIR} is not set and no chroma_dir was provided."
+            )
 
         if not self.chroma_dir.exists():
             s3_prefix = os.environ.get(ENV_CHROMA_S3_PREFIX, "").strip()
