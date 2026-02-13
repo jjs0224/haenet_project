@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
 import re
 
-
+from .halal_rules import normalize_religion, haram_flags_from_text
 # ------------------------------------------------------------
 # Utility helpers
 # ------------------------------------------------------------
@@ -185,7 +185,7 @@ def _compute_user_risk_match(
 
     user_allergy = set(str(x).strip() for x in _as_list(user_profile.get("allergy_tags")) if str(x).strip())
     user_avoid = [str(x).strip() for x in _as_list(user_profile.get("avoid_foods")) if str(x).strip()]
-    religion = _safe_str(user_profile.get("religion"))
+    religion = normalize_religion(user_profile.get("religion"))
 
     conf_alg = set(str(x).strip() for x in _as_list(confirmed.get("alg_tags")) if str(x).strip())
     conf_ing = [str(x).strip() for x in _as_list(confirmed.get("ingredients")) if str(x).strip()]
@@ -216,13 +216,8 @@ def _compute_user_risk_match(
 
     religion_flags: List[str] = []
     if religion == "islam_halal":
-        blob = (conf_menu + " " + " ".join(conf_ing)).lower()
-        if any(k in blob for k in ["술","소주","맥주","와인","럼","브랜디","청하","막걸리","alcohol","wine","beer","soju"]):
-            religion_flags.append("ALCOHOL_SUSPECT")
-        if any(k in blob for k in ["돼지","삼겹","족발","보쌈","pork"]):
-            religion_flags.append("PORK_SUSPECT")
-        if any(k in blob for k in ["라드","lard"]):
-            religion_flags.append("LARD_SUSPECT")
+        blob = (conf_menu + " " + " ".join(conf_ing))
+        religion_flags.extend(haram_flags_from_text(blob))
 
     has_any = bool(allergy_hits or avoid_hits or religion_flags)
 
@@ -241,13 +236,32 @@ def _compute_user_risk_match(
 def _compute_risk_difficulty_exact(*, risk_match: Dict[str, Any]) -> int:
     """Exact-only risk_difficulty (0/1/2)
 
-    Rule (user request):
-      - 2: allergy_tag_hits OR religion_hits has at least one element
+    Rule (project decision, deterministic):
+      - 2: allergy_tag_hits has at least one element OR religion_hit indicates any flag
       - 1: only avoid_food_hits has at least one element
-      - 0: no hits
+      - 0: no hits at all
     """
     if not isinstance(risk_match, dict):
         return 0
+
+    allergy_hits = risk_match.get("allergy_tag_hits") or []
+    avoid_hits = risk_match.get("avoid_food_hits") or []
+
+    # religion_hit is stored as a string (e.g., "ALCOHOL_SUSPECT,PORK_SUSPECT") or None
+    rh = risk_match.get("religion_hit")
+    religion_flags: List[str] = []
+    if isinstance(rh, str) and rh.strip():
+        # split by comma and drop empties
+        religion_flags = [x.strip() for x in rh.split(",") if x.strip()]
+    elif isinstance(rh, list):
+        # tolerate legacy list form
+        religion_flags = [str(x).strip() for x in rh if str(x).strip()]
+
+    if allergy_hits or religion_flags:
+        return 2
+    if avoid_hits:
+        return 1
+    return 0
     allergy_hits = risk_match.get("allergy_tag_hits") or []
     religion_hits = risk_match.get("religion_hits") or []
     avoid_hits = risk_match.get("avoid_food_hits") or []
@@ -273,7 +287,13 @@ def _build_comment_exact(
 
     allergy_hits = _as_list(risk_match.get("allergy_tag_hits"))
     avoid_hits = _as_list(risk_match.get("avoid_food_hits"))
-    religion_hits = _as_list(risk_match.get("religion_hits"))
+        # ✅ religion_hit: string flags (e.g., "ALCOHOL_SUSPECT,PORK_SUSPECT") or None
+    rh = risk_match.get("religion_hit")
+    religion_hits = []
+    if isinstance(rh, str) and rh.strip():
+        religion_hits = [x.strip() for x in rh.split(",") if x.strip()]
+    elif isinstance(rh, list):
+        religion_hits = [str(x).strip() for x in rh if str(x).strip()]
 
     # 1) allergy tag 기반 질문
     #    (태그->자연어 매핑은 추후 확장 가능. 지금은 태그 그대로 노출하되, 예시를 괄호로 붙이는 정도)
@@ -305,7 +325,7 @@ def _build_comment_exact(
         if isinstance(user_profile, dict):
             at = _as_list(user_profile.get("allergy_tags"))
             af = _as_list(user_profile.get("avoid_foods"))
-            rel = _safe_str(user_profile.get("religion"))
+            rel = normalize_religion(user_profile.get("religion"))
 
             # 우선순위: allergy_tags -> avoid_foods -> religion
             if at:

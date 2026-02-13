@@ -9,10 +9,59 @@ services:
       - redis_data:/data
     command: ["redis-server", "--appendonly", "yes"]
 
+  # 1) Chroma 인덱스 빌더(1회 실행 후 종료)
+  # - 빌드 결과는 chroma_data 볼륨에 영속 저장
+  index_builder:
+    build:
+      context: .
+      dockerfile: worker.Dockerfile
+    container_name: app_index_builder
+    restart: "no"
+    depends_on:
+      - redis
+    environment:
+      # build_chroma_index.py 기본 경로 정책과 맞추기 위해 명시 (안전)
+      - CHROMA_DIR=/app/AI/menu_assistant/data/chroma
+      - DATASET_PATH=/app/AI/menu_assistant/data/datasets/raw/menu_seed.json
+      - COLLECTION=menu_index
+      - EMBED_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+    volumes:
+      - chroma_data:/app/AI/menu_assistant/data/chroma
+    # 볼륨 권한 이슈 방지: 먼저 권한 맞추고 실행
+    user: "0:0"
+    command: >
+      bash -lc "
+        set -e;
+        mkdir -p ${CHROMA_DIR};
+        chown -R 10001:10001 ${CHROMA_DIR};
+
+        python /app/AI/menu_assistant/worker/scripts/build_chroma_index.py
+          --dataset ${DATASET_PATH}
+          --chroma_dir ${CHROMA_DIR}
+          --collection ${COLLECTION}
+          --embed_model ${EMBED_MODEL}
+      "
+
+  # 2) 실제 Worker (상시 실행)
+  worker:
+    build:
+      context: .
+      dockerfile: worker.Dockerfile
+    container_name: app_worker
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - index_builder
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - QUEUE_NAME=cicdex:jobs
+
+      # (선택) step_04_rag_match에서 exact-precheck JSON을 S3에서 받을 때만 사용
+      # - MENU_ASSISTANT_MENU_INDEX_S3_URI=s3://.../menu_seed_with_alg_tags_variants_v3.json
+    volumes:
+      # build가 만든 chroma 인덱스를 worker가 그대로 사용
+      - chroma_data:/app/AI/menu_assistant/data/chroma
+
 volumes:
   redis_data:
-
-
-#restart: unless-stopped : 재부팅/도커 재시작에도 자동 기동
-#volumes : 데이터 유지
-#appendonly yes : AOF로 저장(개발할 때 키가 유지되면 편함)
+  chroma_data:
