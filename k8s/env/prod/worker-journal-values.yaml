@@ -1,0 +1,35 @@
+image:
+    repository: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-worker-gpu
+    tag: "sha-8c8fe31c9764e0c24a555be5f997f8a563abb4cf"
+    pullPolicy: IfNotPresent
+
+worker:
+    args: ["-m", "AI.journal.worker.worker_app.main"]
+
+env:
+    APP_ENV: prod
+
+queue:
+    type: redis
+    redisUrl: redis://redis.app-prod.svc.cluster.local:6379/0
+    name: "cicdex:jobs:journal"
+    processingName: "cicdex:jobs:journal:processing"
+config:
+    LOG_LEVEL: INFO
+    S3_BUCKET: haenet-s3-project
+    S3_PREFIX: upload/
+    S3_PREFIX_TMP: tmp
+    S3_PREFIX_PERM: perm
+    S3_REGION: ap-northeast-2
+
+secrets:
+    enabled: false
+    GEMINI_API_KEY: PROD_GEMINI_API_KEY_CHANGE_ME
+    DB_PASSWORD: PROD_DB_PASSWORD_CHANGE_ME
+    JWT_SECRET_KEY: PROD_JWT_CHANGE_ME
+
+autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 80
