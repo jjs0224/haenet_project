@@ -158,11 +158,23 @@ async def review_create(
         log_exception("router.review_create", e)
         raise
 
-# active True or 1
+# # active True or 1
+# @router.get("", response_model=list[ReviewRead])
+# def review_list(db: Session = Depends(get_db)):
+#     # return list_reviews(db, member_id=None, active_only=True)
+#     return list_reviews(db, member_id=None)
+
 @router.get("", response_model=list[ReviewRead])
 def review_list(db: Session = Depends(get_db)):
-    # return list_reviews(db, member_id=None, active_only=True)
-    return list_reviews(db, member_id=None)
+    out = list_reviews(db, member_id=None)
+
+    # 첫번째 것만 확인용 출력 (너무 많이 찍히는 거 방지)
+    if out and out[0].get("image_urls"):
+        print("[APIDBG] /review first image_urls[0] =", out[0]["image_urls"][0])
+    else:
+        print("[APIDBG] /review no image_urls in first item")
+
+    return out
 
 # active 상관없이 내것 전부
 @router.get("/me", response_model=list[ReviewRead])
