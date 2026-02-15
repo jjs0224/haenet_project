@@ -25,6 +25,8 @@ from backend.app.models.community_recommend import CommunityRecommend
 # file upload helpers
 from backend.app.common.service.file_upload_service import save_permanent_bytes, delete_prefix, build_perm_prefix
 
+# s3
+from backend.app.common.utils.util import resolve_asset_urls
 
 # ---------------------------------------------------------------------
 # 등록 Step1
@@ -217,7 +219,8 @@ async def create_step2(db: Session, total_data: Dict[str, Any]) -> Dict[str, Any
         "nickname": nickname,
         "community_active": bool(community.community_active),
         "recommend": int(community.recommend or 0),  # 기존 글이면 추천 유지됨
-        "image_urls": [stored.storage_path] if stored else [],
+        "image_urls": resolve_asset_urls([stored.storage_path] if stored else []), # s3 변경
+        # "image_urls": [stored.storage_path] if stored else [],
         "template_id": total_data.get("template_id"),
         "reviews": total_data.get("reviews", []),
         "community_type": community.community_type,  # 필요하면 프론트에서 구분 가능
@@ -286,7 +289,8 @@ def list_community(
             "recommend": int(c.recommend or 0),
             "created_at": c.create_at.isoformat() if getattr(c, "create_at", None) else None,
             "updated_at": c.update_at.isoformat() if getattr(c, "update_at", None) else None,
-            "image_urls": img_map.get(c.community_id, []),
+            "image_urls": resolve_asset_urls(img_map.get(c.community_id, [])), # s3 변경
+            # "image_urls": img_map.get(c.community_id, []),
             "latest_comment_text": latest_comment_text,  # 댓글
             "community_type": c.community_type,
         })
@@ -344,7 +348,8 @@ def get_community_detail(db: Session, community_id: int, *, member_id: Optional[
         "liked": liked,
         "created_at": c.create_at.isoformat() if getattr(c, "create_at", None) else None,
         "updated_at": c.update_at.isoformat() if getattr(c, "update_at", None) else None,
-        "image_urls": [img.storage_path for img in imgs],
+        "image_urls": resolve_asset_urls([img.storage_path for img in imgs]), # s3 변경
+        # "image_urls": [img.storage_path for img in imgs],
         "latest_comment_text": latest_comment_text,  # 댓글
     }
 

@@ -11,6 +11,9 @@ from backend.app.core import config
 from backend.app.common.utils.debug import log_exception
 from backend.app.common.utils.util import ensure_list, dumps_json, parse_ids
 
+# s3
+from backend.app.common.utils.util import resolve_asset_urls
+
 def parse_menu_name(menu_name_raw: Optional[str]) -> List[str]:
     """
     menu_name 문자열을 파싱하여 리스트로 반환
@@ -248,8 +251,9 @@ async def create_review_from_receipt(
 
         # 성공한 경우에만 세션 삭제
         ReceiptSessionService.delete(receipt_id=receipt_id)
-
-        return {"review_id": review.review_id, "image_urls": image_urls}
+        
+        # s3 변경
+        return {"review_id": review.review_id, "image_urls": resolve_asset_urls(image_urls)}
 
     finally:
         ReceiptSessionService.release_create_lock(receipt_id=receipt_id, token=lock_token)
@@ -309,7 +313,8 @@ def list_reviews(db: Session, *, member_id: Optional[int] = None) -> List[
             # 프론트가 created_at/updated_at 키를 기대해서 맞춰줌
             "created_at": r.create_at.isoformat() if getattr(r, "create_at", None) else None,
             "updated_at": r.update_at.isoformat() if getattr(r, "update_at", None) else None,
-            "image_urls": img_map.get(r.review_id, []),
+            "image_urls": resolve_asset_urls(img_map.get(r.review_id, [])), # s3 변경
+            # "image_urls": img_map.get(r.review_id, []),
         })
 
     print("out :: ", out)
@@ -351,7 +356,8 @@ def get_review_detail(db: Session, review_id: int) -> Dict[str, Any]:
         "review_items": parse_ids(r.review_items),
         "created_at": r.create_at.isoformat() if getattr(r, "create_at", None) else None,
         "updated_at": r.update_at.isoformat() if getattr(r, "update_at", None) else None,
-        "image_urls": [img.storage_path for img in imgs],
+        "image_urls": resolve_asset_urls([img.storage_path for img in imgs]), # s3 변경
+        # "image_urls": [img.storage_path for img in imgs],
     }
 
 
@@ -453,7 +459,8 @@ def list_reviews_by_ids(
             "review_items": parse_ids(r.review_items),
             "created_at": r.create_at.isoformat() if getattr(r, "create_at", None) else None,
             "updated_at": r.update_at.isoformat() if getattr(r, "update_at", None) else None,
-            "image_urls": img_map.get(r.review_id, []),
+            "image_urls": resolve_asset_urls(img_map.get(r.review_id, [])), # s3 변경
+            # "image_urls": img_map.get(r.review_id, []),
         }
 
     # 4) 요청한 review_ids 순서대로 정렬해서 반환
