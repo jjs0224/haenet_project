@@ -85,25 +85,20 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         time.sleep(max(0, sec))
         return {"slept": sec}
 
-    # 기존: 단순 저널 생성(베이스64 반환) - 유지
+    # 저널 생성 - orchestrator 사용 (템플릿 라우팅 지원)
     if task == "journal_generate":
-        from AI.journal_assistant.pipeline import journal as journal_module
+        from AI.journal_assistant.pipeline.orchestrator import run_orchestrator
 
-        journal_type = str(payload.get("journal_type") or "journal").strip().lower()
-        if journal_type not in ("journal", "culture"):
-            raise ValueError("journal_type must be 'journal' or 'culture'")
-
-        if journal_type == "culture":
-            prompt = journal_module.culture_journal(payload)
-        else:
-            prompt = journal_module.journal_prompt(payload)
-
-        image_bytes = journal_module.generate_journal(prompt)
+        # orchestrator가 template_type 또는 template_id로 자동 라우팅
+        image_bytes = run_orchestrator(payload)
         if not image_bytes:
             raise ValueError("Journal generation returned empty image")
 
         import base64
         encoded = base64.b64encode(image_bytes).decode("ascii")
+
+        # journal_type은 payload에서 추출 (backward compatibility)
+        journal_type = str(payload.get("journal_type") or payload.get("template_type") or "journal").strip().lower()
         return {"image_base64": encoded, "journal_type": journal_type}
 
     # 추가: 커뮤니티 생성 (AI 이미지 생성 + S3 저장 + RDS 반영까지 worker가 수행)

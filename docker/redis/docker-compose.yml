@@ -55,6 +55,7 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379/0
       - QUEUE_NAME=cicdex:jobs
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
 
       # (선택) step_04_rag_match에서 exact-precheck JSON을 S3에서 받을 때만 사용
       # - MENU_ASSISTANT_MENU_INDEX_S3_URI=s3://.../menu_seed_with_alg_tags_variants_v3.json
