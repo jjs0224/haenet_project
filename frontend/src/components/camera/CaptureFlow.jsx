@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import LiveCameraLayer from "./LiveCameraLayer";
 import './Capture.css';
 
