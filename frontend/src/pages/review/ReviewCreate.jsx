@@ -53,6 +53,21 @@ export default function ReviewCreateInline({ onCreated }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [images]);
 
+  const verify = async () => {
+    setErr("");
+    setMsg("");
+    if (!receiptFile) return setErr("Please select the image of the receipt");
+
+    setLoadingVerify(true);
+    try {
+      const r = await ReviewAPI.verifyReceipt(receiptFile);
+      const ext = r.data?.extracted || null;
+
+      const coords = ext?.coords;
+      if (!coords || coords.x == null || coords.y == null) {
+        alert("Please attach the receipt with the store address again");
+
+        // reset
     // -------------------------
     // Helpers
     // -------------------------
@@ -206,36 +221,67 @@ export default function ReviewCreateInline({ onCreated }) {
             const rawMenu = ext?.menu_en ?? ext?.menu_name ?? ext?.menu ?? null;
             const parsedMenus = parseMenus(rawMenu);
             setMenuList(parsedMenus);
+      if (ext?.menu_en) {
+        const raw = ext.menu_en;
+        const parsed = Array.isArray(raw)
+          ? raw.map((m) => String(m).replace(/["[\]]/g, "").trim())
+          : raw.split(",").map((m) => m.replace(/["[\]]/g, "").trim());
+        const filtered = parsed.filter(Boolean);
+        setMenuList(filtered);
+        // 기본적으로 모든 메뉴 선택
+        setSelectedMenus(new Set(filtered.map((_, i) => i)));
+      }
 
             setMsg("Receipt certified. Please check the menu.");
         } catch (e) {
-            setErr(
-                e?.response?.data?.detail ||
-                    e?.message ||
-                    "Receipt authentication failed",
-            );
-        } finally {
+            console.error("Receipt verification error:", e);
+
+      // 401 에러 처리
+      if (e?.response?.status === 401) {
+        setErr("Session expired. Please log in again and try again.");
+      } else {
+        setErr(
+                  e?.response?.data?.detail ||
+                      e?.message ||
+                      "Receipt authentication failed",
+              );
+          }
+    } finally {
             setLoadingVerify(false);
         }
     };
 
-    // -------------------------
-    // Menu confirm/cancel
-    // -------------------------
-    const confirmMenu = () => {
-        setMenuConfirmed(true);
-        setMsg("Checked the menu. Please write a review.");
-    };
+  const confirmMenu = () => {
+    setMenuConfirmed(true);
+    setMsg("Checked the menu. Please write a review.");
+  };
 
-    const cancelMenu = () => {
-        setMsg("");
-        setErr("");
-        resetReceiptFlow();
-    };
+  const cancelMenu = () => {
+    setReceiptId(null);
+    setExtracted(null);
+    setMenuList([]);
+    setSelectedMenus(new Set());
+    setReceiptFile(null);
+    if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+    setReceiptPreviewUrl(null);
+    setMenuConfirmed(false);
+    setShowCamera(false);
+    setMsg("");
+    setErr("");
+    if (receiptInputRef.current) receiptInputRef.current.value = "";
+  };
 
-    const removeMenu = (idx) => {
-        setMenuList((prev) => prev.filter((_, i) => i !== idx));
-    };
+  const toggleMenuSelection = (idx) => {
+    setSelectedMenus((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) {
+        next.delete(idx);
+      } else {
+        next.add(idx);
+      }
+      return next;
+    });
+  };
 
     // -------------------------
     // Review images (0~3)
@@ -244,8 +290,8 @@ export default function ReviewCreateInline({ onCreated }) {
         const files = Array.from(e.target.files || []);
         if (!files.length) return;
 
-        setErr("");
-        setMsg("");
+    setErr("");
+    setMsg("");
 
         setImages((prev) => {
             const merged = [...prev, ...files];
@@ -266,24 +312,26 @@ export default function ReviewCreateInline({ onCreated }) {
     // -------------------------
     // Create Review
     // -------------------------
-    const create = async () => {
-        setErr("");
-        setMsg("");
+  const create = async () => {
+    setErr("");
+    setMsg("");
 
-        if (!receiptId) return setErr("Please verify the receipt first");
-        if (!title.trim()) return setErr("Please enter the title");
-        if (!content.trim()) return setErr("Please enter the content");
-        if (images.length > 3) return setErr("upload up to three images.");
+    if (!receiptId) return setErr("Please verify the receipt first");
+    if (!title.trim()) return setErr("Please enter the title");
+    if (!content.trim()) return setErr("Please enter the content");
+    if (images.length > 3) return setErr("upload up to three images.");
 
         setLoadingCreate(true);
 
         try {
-            const r = await ReviewAPI.createFromReceipt({
+            // 선택된 메뉴만 필터링
+      const selectedMenuList = menuList.filter((_, i) => selectedMenus.has(i));
+      const r = await ReviewAPI.createFromReceipt({
                 receipt_id: receiptId,
                 title,
                 content,
                 rating,
-                menu_name: JSON.stringify(menuList),
+                menu_name: JSON.stringify(selectedMenuList),
                 images,
             });
 
@@ -295,22 +343,25 @@ export default function ReviewCreateInline({ onCreated }) {
             // callback
             onCreated?.(r.data);
 
-            // reset all
-            resetReceiptFlow();
-            setTitle("");
-            setContent("");
-            setRating(5);
-            setImages([]);
-        } catch (e) {
-            setErr(
-                e?.response?.data?.detail ||
-                    e?.message ||
-                    "Failed to create review",
-            );
-        } finally {
-            setLoadingCreate(false);
-        }
-    };
+      setReceiptFile(null);
+      if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+      setReceiptPreviewUrl(null);
+      setReceiptId(null);
+      setExtracted(null);
+      setMenuList([]);
+      setSelectedMenus(new Set());
+      setMenuConfirmed(false);
+      setShowCamera(false);
+      setTitle("");
+      setContent("");
+      setRating(5);
+      setImages([]);
+    } catch (e) {
+      setErr(e?.response?.data?.detail || e?.message || "Failed to create review");
+    } finally {
+      setLoadingCreate(false);
+    }
+  };
 
     // -------------------------
     // UI
@@ -335,47 +386,48 @@ export default function ReviewCreateInline({ onCreated }) {
                 <div className={styles.stepSection}>
                     <div className={styles.stepHeader}>Verify Receipt</div>
 
-                    {/* camera page */}
-                    {showCamera && !receiptFile && (
-                        <CaptureFlow
-                            onDone={(file) => {
-                                setReceiptFile(file);
-                                if (receiptPreviewUrl)
-                                    URL.revokeObjectURL(receiptPreviewUrl);
-                                setReceiptPreviewUrl(URL.createObjectURL(file));
-                                setShowCamera(false);
-                            }}
-                        />
-                    )}
+          {/* camera page */}
+          {showCamera && !receiptFile && (
+            <CaptureFlow
+              onDone={(file) => {
+                setReceiptFile(file);
+                if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+                setReceiptPreviewUrl(URL.createObjectURL(file));
+                setShowCamera(false); // back to normal UI
+              }}
+            />
+          )}
 
-                    {/* normal upload UI */}
-                    {!showCamera && (
-                        <>
-                            <div className={styles.receiptUpload}>
-                                <input
-                                    ref={receiptInputRef}
-                                    type="file"
-                                    accept="image/*"
-                                    disabled={loadingVerify}
-                                    onChange={(e) => {
-                                        const f = e.target.files?.[0] || null;
-                                        setReceiptFile(f);
-                                        if (receiptPreviewUrl)
-                                            URL.revokeObjectURL(
-                                                receiptPreviewUrl,
-                                            );
-                                        setReceiptPreviewUrl(
-                                            f ? URL.createObjectURL(f) : null,
-                                        );
-                                    }}
-                                    className={styles.fileInput}
-                                />
+          {/* normal upload UI (your original) */}
+          {!showCamera && (
+            <>
+              <div className={styles.receiptUpload}>
+                <input
+                  ref={receiptInputRef}
+                  type="file"
+                  accept="image/*"
+                  disabled={loadingVerify}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null;
+                    setReceiptFile(f);
+                    if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+                    setReceiptPreviewUrl(f ? URL.createObjectURL(f) : null);
+                  }}
+                  className={styles.fileInput}
+                />
 
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setErr("");
                                         setMsg("");
+                    // 기존 파일이 있으면 초기화
+                    if (receiptFile) {
+                      setReceiptFile(null);
+                      if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+                      setReceiptPreviewUrl(null);
+                      if (receiptInputRef.current) receiptInputRef.current.value = "";
+                    }
                                         setShowCamera(true);
                                     }}
                                     disabled={loadingVerify}
@@ -408,52 +460,33 @@ export default function ReviewCreateInline({ onCreated }) {
                 </div>
             )}
 
-            {/* Step 2 */}
-            {receiptId && extracted && (
-                <div className={styles.stepSection}>
-                    <div className={styles.stepHeader}>
-                        Confirm Receipt Details
-                    </div>
-
-                    <p>
-                        {extracted.store_name} / {extracted.store_name_en}
-                    </p>
-
-                    <div className={styles.menuConfirmSection}>
-                        {!menuConfirmed && (
-                            <p className={styles.menuConfirmText}>
-                                Please only select your menu
-                            </p>
-                        )}
-
-                        <div className={styles.menuList}>
-                            {menuList.length > 0 ? (
-                                menuList.map((menu, idx) => (
-                                    <div key={idx} className={styles.menuItem}>
-                                        <span className={styles.menuIcon}>
-                                            🍽️
-                                        </span>
-                                        <span className={styles.menuName}>
-                                            {menu}
-                                        </span>
-                                        {!menuConfirmed && (
-                                            <button
-                                                type="button"
-                                                onClick={() => removeMenu(idx)}
-                                                className={styles.btnRemoveMenu}
-                                                title="Delete Menu"
-                                            >
-                                                ×
-                                            </button>
-                                        )}
-                                    </div>
-                                ))
-                            ) : (
-                                <p className={styles.menuConfirmText}>
-                                    There's no menu.
-                                </p>
-                            )}
-                        </div>
+      {/* Step 2 */}
+      {receiptId && extracted && (
+        <div className={styles.stepSection}>
+          <div className={styles.stepHeader}>Confirm Receipt Details</div>
+          <p>
+            {extracted.store_name} / {extracted.store_name_en}
+          </p>
+          <div className={styles.menuConfirmSection}>
+            {!menuConfirmed && (
+              <p className={styles.menuConfirmText}>Please only select your menu</p>
+            )}
+            <div className={styles.menuList}>
+              {menuList.length > 0 ? (
+                menuList.map((menu, idx) => (
+                  <div
+                    key={idx}
+                    className={`${styles.menuItem} ${!selectedMenus.has(idx) ? styles.deselected : ''}`}
+                    onClick={() => !menuConfirmed && toggleMenuSelection(idx)}
+                  >
+                    <span className={styles.menuIcon}>🍽️</span>
+                    <span className={styles.menuName}>{menu}</span>
+                  </div>
+                ))
+              ) : (
+                <p className={styles.menuConfirmText}>There's no menu.</p>
+              )}
+            </div>
 
                         {!menuConfirmed && (
                             <div className={styles.menuConfirmButtons}>
@@ -574,14 +607,8 @@ export default function ReviewCreateInline({ onCreated }) {
                 </div>
             )}
 
-            {msg && (
-                <div className={`${styles.message} ${styles.success}`}>
-                    {msg}
-                </div>
-            )}
-            {err && (
-                <div className={`${styles.message} ${styles.error}`}>{err}</div>
-            )}
-        </div>
-    );
+      {msg && <div className={`${styles.message} ${styles.success}`}>{msg}</div>}
+      {err && <div className={`${styles.message} ${styles.error}`}>{err}</div>}
+    </div>
+  );
 }

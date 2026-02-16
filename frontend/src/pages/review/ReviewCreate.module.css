@@ -131,6 +131,34 @@
   transform: none;
 }
 
+/* ===== Camera Button ===== */
+.btnCamera {
+  padding: 4px 11px;
+  background: #2E7D32;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btnCamera:hover {
+  background: #1B5E20;
+  transform: translateY(-2px);
+}
+
+.btnCamera:disabled {
+  background: #E0E0E0;
+  cursor: not-allowed;
+  transform: none;
+  opacity: 0.6;
+}
+
 /* ===== Menu Confirm Section ===== */
 .menuConfirmSection {
   display: flex;
@@ -156,16 +184,23 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #FFFFFF;
+  background: #C8E6C9;
   border-radius: 8px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   transition: all 0.2s;
+  cursor: pointer;
+  opacity: 1;
 }
 
 .menuItem:hover {
   transform: translateX(4px);
   box-shadow: 0 4px 10px rgba(46, 125, 50, 0.15);
   border-left: 3px solid #81C784;
+}
+
+.menuItem.deselected {
+  opacity: 0.3;
+  background: #F5F5F5;
 }
 
 .menuIcon {

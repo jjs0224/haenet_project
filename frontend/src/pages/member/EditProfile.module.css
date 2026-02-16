@@ -214,12 +214,12 @@
   align-items: center;
   gap: 4px;
   padding: 5px 10px;
-  background: #E8F5E9;
-  color: #2E7D32;
+  background: #f5e8e8;
+  color: #d10c05;
   border-radius: 14px;
   font-size: 11px;
   font-weight: 500;
-  border: 1px solid #81C784;
+  border: 1px solid #c78181;
 }
 
 /* ===== Dislike Input Row ===== */

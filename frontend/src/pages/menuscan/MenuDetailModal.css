@@ -4,7 +4,7 @@
 .ms-mdm__overlay {
   position: fixed;
   inset: 0;
-  background: rgba(27, 94, 32, 0.52);   /* 그린 반투명 백드롭 */
+  background: rgba(175, 204, 177, 0.52);   /* 그린 반투명 백드롭 */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -18,7 +18,7 @@
   border-radius: 16px;
   padding: 16px 14px 18px;
   box-shadow: 0 12px 32px rgba(46, 125, 50, 0.25);
-  border-top: 3px solid #2E7D32;   /* 모달 윗선 그린 강조 */
+  border-top: 3px solid #2E7D32;   
 }
 .ms-mdm__chip {
   display: inline-flex;
