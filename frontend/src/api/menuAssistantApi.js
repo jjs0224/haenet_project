@@ -3,15 +3,15 @@ import api from "./axiosInstance";
 export const MenuAssistantAPI = {
   enqueue: ({ file, userProfile, runStep4 = true, runStep5 = true, runStep6 = true }) => {
     const fd = new FormData();
-    fd.append("image", file);
+    fd.append("type", "menu");
+    fd.append("file", file);
+    let profileText = "";
     if (userProfile) {
-      fd.append("user_profile_json", JSON.stringify(userProfile));
+      profileText = typeof userProfile === "string" ? userProfile : JSON.stringify(userProfile);
     }
-    fd.append("run_step4", String(runStep4));
-    fd.append("run_step5", String(runStep5));
-    fd.append("run_step6", String(runStep6));
+    fd.append("user_profile", profileText);
 
-    return api.post("/menu/assistant", fd, {
+    return api.post("/menu/upload", fd, {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
