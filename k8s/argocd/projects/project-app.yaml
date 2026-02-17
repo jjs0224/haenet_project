@@ -1,4 +1,4 @@
-apiVersion: argoproj.io/v1alpha1
+ï»¿apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
   name: app-platform
@@ -14,15 +14,14 @@ spec:
     - server: https://kubernetes.default.svc
       namespace: argocd
     - server: https://kubernetes.default.svc
-      namespace: app-dev
-    - server: https://kubernetes.default.svc
       namespace: app-prod
 
-  # AppProject ?ì²´??namespace ë¦¬ì†Œ?¤ë? ??„“ê²??ˆìš©(?¨ìˆœ??
+  # AppProject ?ï¿½ì²´??namespace ë¦¬ì†Œ?ï¿½ï¿½? ??ï¿½ï¿½ï¿½??ï¿½ìš©(?ï¿½ìˆœ??
   clusterResourceWhitelist:
     - group: "*"
       kind: "*"
   namespaceResourceWhitelist:
     - group: "*"
       kind: "*"
+
 

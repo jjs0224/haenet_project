@@ -4,6 +4,7 @@ export function buildDefaultJournalPayload() {
   return {
     journal_type: "journal",
     template: {
+      template_type: 1,  // 1=journal, 2=map
       language: "en",
       style: {},
     },

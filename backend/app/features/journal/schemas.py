@@ -9,6 +9,7 @@ class JournalType(str, Enum):
 
 
 class JournalTemplate(BaseModel):
+    template_type: Optional[int] = Field(1, description="Template type: 1=journal, 2=map")
     language: str = Field("en", description="Output language code (default: en)")
     style: Optional[dict] = Field(default=None, description="Optional style overrides")
 

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { MenuAssistantAPI } from "../../api/menuAssistantApi";
-import { JobAPI } from "../../api/jobApi";
+import { MenuAPI } from "../../api/menuApi";
 
 export default function MenuAssistant() {
     const [file, setFile] = useState(null);
@@ -64,7 +64,7 @@ export default function MenuAssistant() {
         }
 
         try {
-            const res = await JobAPI.get(jobId);
+            const res = await MenuAPI.getMenuJob(jobId);
             setJobStatus(res.data);
         } catch (e) {
             setJobError(e?.response?.data?.detail || "job status fetch failed");

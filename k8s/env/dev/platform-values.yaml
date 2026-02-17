@@ -1,3 +1,0 @@
-host: app.local
-apiServiceName: api-dev
-frontendServiceName: frontend-dev
