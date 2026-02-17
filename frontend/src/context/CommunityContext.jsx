@@ -68,6 +68,9 @@ export function CommunityProvider({ children }) {
     update: async (id, payload) => (await CommunityAPI.update(id, payload)).data,
 //     remove: async (id) => (await CommunityAPI.remove(id)).data,
 
+    // 0217 jk 추가
+    jobStatus: async (jobId) => (await CommunityAPI.jobStatus(jobId)).data,
+
 
     /**
      * 추천 토글
