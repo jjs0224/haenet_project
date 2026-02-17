@@ -340,6 +340,103 @@ def toggle_active(db: Session, *, community_id: int, member_id: int) -> Dict[str
 
     return {"community_id": c.community_id, "community_active": bool(c.community_active)}
 
+# 0217 jk 추가
+def create_pending_community(db: Session, total_data: Dict[str, Any]) -> Dict[str, Any]:
+    template_id = int(total_data.get("template_id") or 0)
+    community_type = "journal" if template_id == 1 else ("map" if template_id == 2 else None)
+
+    community: Optional[Community] = None
+    if community_type == "map":
+        community = db.execute(
+            select(Community)
+            .where(Community.member_id == int(total_data["member_id"]))
+            .where(Community.community_type == "map")
+            .order_by(Community.community_id.desc())
+        ).scalar_one_or_none()
+
+    if community is None:
+        community = Community(
+            member_id=int(total_data["member_id"]),
+            community_active=True,
+            recommend=0,
+            community_type=community_type,
+        )
+        db.add(community)
+        db.flush()
+    else:
+        if community.community_type != community_type:
+            community.community_type = community_type
+        community.update_at = func.now()
+        db.flush()
+
+    return {
+        "community_id": community.community_id,
+        "community_type": community.community_type,
+    }
+
+# 0217 jk 추가
+def finalize_from_worker_result(
+    db: Session,
+    *,
+    total_data: Dict[str, Any],
+    community_id: int,
+    stored: Dict[str, Any],
+    template_id: int,
+    review_ids: List[int],
+) -> Dict[str, Any]:
+    nickname = (total_data.get("member") or {}).get("nickname") or ""
+
+    community = db.execute(
+        select(Community).where(Community.community_id == int(community_id))
+    ).scalar_one_or_none()
+    if community is None:
+        raise HTTPException(status_code=404, detail="community not found")
+
+    # community는 이미지 1장 유니크라서 기존 레코드 정리 필요
+    db.execute(
+        delete(ImgFile)
+        .where(ImgFile.owner_type == "community")
+        .where(ImgFile.community_id == int(community_id))
+    )
+    db.flush()
+
+    img = ImgFile(
+        origin_name=str(stored.get("org_file_name") or stored.get("origin_name") or "community.png"),
+        storage_key=str(stored.get("stored_file_name") or stored.get("storage_key") or ""),
+        storage_path=str(stored.get("storage_path") or ""),
+        mime_type=str(stored.get("mime_type") or "image/png"),
+        file_size=int(stored.get("size_bytes") or stored.get("file_size") or 0),
+        sort_order=int(stored.get("sort_order") or 0),
+        owner_type="community",
+        member_id=int(total_data["member_id"]),
+        community_id=int(community_id),
+        review_id=None,
+    )
+    db.add(img)
+
+    if int(template_id) == 1:
+        from backend.app.features.review.service import availavble_review
+        ok = availavble_review(db, review_ids)
+        if not ok:
+            raise HTTPException(status_code=500, detail="Failed to update review availability")
+
+    db.flush()
+    db.refresh(community)
+
+    return {
+        "community_id": int(community_id),
+        "member_id": community.member_id,
+        "nickname": nickname,
+        "community_active": bool(community.community_active),
+        "recommend": int(community.recommend or 0),
+        "image_urls": resolve_asset_urls([str(stored.get("storage_path") or "")]),
+        "template_id": int(template_id),
+        "reviews": total_data.get("reviews", []),
+        "community_type": community.community_type,
+        "storage_path": str(stored.get("storage_path") or ""),
+    }
+
+
 
 # from sqlalchemy.orm import Session
 # from sqlalchemy import select, delete, update, func
