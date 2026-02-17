@@ -30,4 +30,5 @@ export const CommunityAPI = {
   toggleActive: (community_id) =>
   api.patch(`/community/${community_id}/active`),
 
+  jobStatus: (jobId) => api.get(`/community/job/${jobId}`),
 };

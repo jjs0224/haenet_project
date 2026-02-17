@@ -4,22 +4,43 @@ import redis
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from backend.app.core.config import REDIS_URL
+from backend.app.core.config import REDIS_DB, REDIS_HOST, REDIS_PORT, REDIS_URL
 
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+
+def _normalize_redis_url() -> str:
+    raw = (REDIS_URL or "").strip()
+
+    if raw.startswith(("redis://", "rediss://", "unix://")):
+        return raw
+
+    if raw.startswith("tcp://"):
+        return "redis://" + raw[len("tcp://"):]
+
+    if not raw:
+        return f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+
+    return raw if raw.startswith("redis://") else f"redis://{raw}"
+
 def connect_redis() -> redis.Redis:
-    r = redis.Redis.from_url(
-        REDIS_URL,
-        decode_responses=True,
-        socket_connect_timeout=5,
-        socket_timeout=5,
-    )
+    url = _normalize_redis_url()
+    r = redis.Redis.from_url(url, decode_responses=True, socket_connect_timeout=5, socket_timeout=5)
     r.ping()
     return r
+
+# def connect_redis() -> redis.Redis:
+#     r = redis.Redis.from_url(
+#         REDIS_URL,
+#         decode_responses=True,
+#         socket_connect_timeout=5,
+#         socket_timeout=5,
+#     )
+#     r.ping()
+#     return r
 
 
 def _job_key(job_id: str) -> str:
