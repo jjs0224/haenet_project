@@ -28,7 +28,7 @@ export const MenuAPI = {
   getMenuJob: (jobId) => api.get(`/menu/job/${jobId}`),
   waitMenuJob: async (jobId, opts = {}) => {
     const intervalMs = opts.intervalMs ?? 2000;
-    const maxAttempts = opts.maxAttempts ?? 90;
+    const maxAttempts = opts.maxAttempts ?? 300;  // 2초 × 300회 = 10분
     for (let i = 0; i < maxAttempts; i += 1) {
       const res = await MenuAPI.getMenuJob(jobId);
       const status = res?.data?.status;
