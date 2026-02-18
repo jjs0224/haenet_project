@@ -1,13 +1,19 @@
 # 목적: 운영 최소 구성
-# - (가능하면) auth 활성
-# - persistence 활성
+# - auth 비활성
+# - persistence 비활성 (PVC 불필요)
 # - ClusterIP 내부 전용
 
 auth:
     enabled: false
 
-persistence:
-    enabled: false
+master:
+    persistence:
+        enabled: false
+
+replica:
+    persistence:
+        enabled: false
+    replicaCount: 1
 
 service:
     type: ClusterIP

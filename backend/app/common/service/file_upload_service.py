@@ -130,6 +130,34 @@ async def save_temp_bytes(
     )
 
 
+async def save_permanent_asset(
+    *,
+    owner_type: str,
+    owner_id: int,
+    member_id: int,
+    upload: UploadFile,
+    sort_order: int,
+) -> StoredAsset:
+    """
+    리뷰 이미지 등 영구 저장
+    - local: uploads/perm/{owner_type}/{owner_id}/...
+            storage_path=/static/perm/{owner_type}/{owner_id}/...
+    - s3:    upload/perm/{owner_type}/{owner_id}/...
+    """
+    storage = get_storage()
+    if not hasattr(storage, "save_permanent"):
+        raise RuntimeError("Storage does not support save_permanent()")
+
+    stored = await storage.save_permanent(
+        owner_type=owner_type,
+        owner_id=owner_id,
+        member_id=member_id,
+        upload=upload,
+        sort_order=sort_order,
+    )
+    return stored
+
+
 # --------------------------------------------------------------------
 # Local path guarantee (AI 필요)
 # --------------------------------------------------------------------
