@@ -11,7 +11,7 @@ env:
     DB_PORT: "3306"
     DB_NAME: foodray_db_rds
     DB_USER: admin
-    REDIS_URL: "redis://redis.app-prod.svc.cluster.local:6379/0"
+    REDIS_URL: "redis://redis-prod-master.app-prod.svc.cluster.local:6379/0"
     QUEUE_NAME_MENU_ASSISTANT: "cicdex:jobs:menu_assistant"
     QUEUE_NAME_JOURNAL: "cicdex:jobs:journal"
     QUEUE_NAME_REVIEW: "cicdex:jobs:review"

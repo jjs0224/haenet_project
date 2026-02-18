@@ -8,7 +8,7 @@ env:
 
 queue:
     type: redis
-    redisUrl: redis://redis.app-prod.svc.cluster.local:6379/0
+    redisUrl: redis://redis-prod-master.app-prod.svc.cluster.local:6379/0
     name: "cicdex:jobs:menu_assistant"
     processingName: "cicdex:jobs:menu_assistant:processing"
 config:

@@ -11,7 +11,7 @@ env:
 
 queue:
     type: redis
-    redisUrl: redis://redis.app-prod.svc.cluster.local:6379/0
+    redisUrl: redis://redis-prod-master.app-prod.svc.cluster.local:6379/0
     name: "cicdex:jobs:review"
     processingName: "cicdex:jobs:review:processing"
 config:
