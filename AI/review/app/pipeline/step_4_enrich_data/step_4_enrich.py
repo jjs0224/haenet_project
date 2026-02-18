@@ -20,7 +20,7 @@ def run_step4_enrich(ctx: PipelineContext, *, naver_cfg: Dict, gemini_api_key: s
         ctx.store.coords = result["store"].get("coords")
 
     ctx.extracted.menu_en = [
-        m["name_en"] for m in result["menu"]
+        m["name_en"] for m in result["menu"] if m["name_en"] is not None
     ]
 
     if ctx.mode == "debug":
