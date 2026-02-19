@@ -26,11 +26,9 @@
 
 .home-logo-wrap {
   width: calc(100% - 24px);   /* 좌우 여백 12px씩 */
-  flex: none;
-  height: clamp(220px, 55vh, 420px);
-
-  /* 남은 빈 공간을 로고가 모두 채움 → 버튼이 바로 아래로 붙음 */
+  /* 하단 버튼 영역(약 150px)을 남기고 나머지를 로고가 채움 */
   flex: 1 1 0%;
+  max-height: calc(100vh - 150px - 150px); /* 전체 - 헤더/네비 - 하단버튼영역 */
 
   border-radius: 16px;
   overflow: hidden;

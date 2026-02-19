@@ -202,38 +202,33 @@ export default function EditProfile() {
 
       {/* Dislike */}
       <div className={styles.dislikeSection}>
-        <div className={styles.sectionHeader}>
-          <h3 className={styles.sectionTitle}>
-            Dislike Ingredients (Max 3)
-          </h3>
+        <div className={styles.registerSectionTitle}>
+          <h3>Dislike Ingredients (Up to 3)</h3>
+          <div className={styles.sub}>Enter ingredients you don't eat or dislike</div>
         </div>
 
-        <div className={styles.card}>
-          <div className={styles.formGroup}>
-            <div className={styles.inputWrapper}>
-              <label className={styles.label}>Add ingredients</label>
-
-              <div className={styles.inputRow}>
-                <input
-                  type="text"
-                  value={dislikeInput}
-                  onChange={(e) => setDislikeInput(e.target.value)}
-                  onKeyDown={handleDislikeKeyDown}
-                  placeholder="e.g. coriander (click Enter or Add button)"
-                  maxLength={50}
-                  disabled={dislikes.length >= 3}
-                  className={`${styles.input} ${styles.dislikeInput}`}
-                />
-
-                <button
-                  type="button"
-                  onClick={addDislike}
-                  disabled={!dislikeInput.trim() || dislikes.length >= 3}
-                  className={styles.dislikeAddButton}
-                >
-                  Add
-                </button>
-              </div>
+        <div className={styles.dislikesSection}>
+          <div className={styles.row}>
+            <label className={styles.label}>Add Ingredient</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="text"
+                value={dislikeInput}
+                onChange={(e) => setDislikeInput(e.target.value)}
+                onKeyDown={handleDislikeKeyDown}
+                placeholder="e.g ) coriander (press Enter or click Add)"
+                maxLength={50}
+                disabled={dislikes.length >= 3}
+                className={styles.dislikeTextInput}
+              />
+              <button
+                type="button"
+                className={styles.checkBtn}
+                onClick={addDislike}
+                disabled={!dislikeInput.trim() || dislikes.length >= 3}
+              >
+                Add
+              </button>
             </div>
           </div>
 
@@ -246,6 +241,7 @@ export default function EditProfile() {
                     type="button"
                     className={styles.dislikeRemoveBtn}
                     onClick={() => removeDislike(index)}
+                    aria-label="Remove"
                   >
                     ×
                   </button>

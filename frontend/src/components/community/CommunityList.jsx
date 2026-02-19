@@ -59,11 +59,13 @@ export default function CommunityList({ list = [], loading = false, error = "" }
                   <span className={styles.likeCount}>Like {row.recommend ?? 0}</span>
                 </div>
 
-                {/* 작성자 닉네임 + 최신 댓글 */}
+                {/* 댓글 작성자 닉네임 + 최신 댓글 */}
                 <div className={styles.cardComment}>
                   {row.latest_comment_text ? (
                     <>
-                      <span className={styles.commentNickname}>{nickname}</span>
+                      <span className={styles.commentNickname}>
+                        {row.latest_comment_nickname}
+                      </span>
                       <span className={styles.commentText}>{row.latest_comment_text}</span>
                     </>
                   ) : (
