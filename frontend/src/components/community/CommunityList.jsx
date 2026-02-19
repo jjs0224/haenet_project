@@ -64,7 +64,7 @@ export default function CommunityList({ list = [], loading = false, error = "" }
                   {row.latest_comment_text ? (
                     <>
                       <span className={styles.commentNickname}>
-                        {row.latest_comment_nickname || "익명"}
+                        {row.latest_comment_nickname}
                       </span>
                       <span className={styles.commentText}>{row.latest_comment_text}</span>
                     </>
