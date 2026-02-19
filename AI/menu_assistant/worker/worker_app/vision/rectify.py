@@ -1,7 +1,7 @@
 """Image rectification utilities."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 import time
 import cv2
@@ -26,9 +26,9 @@ class RectifyConfig:
     model_dir: Optional[str] = None
 
     # Photometric pipeline (recommended always ON)
-    illumination: IlluminationConfig = IlluminationConfig()
-    denoise: DenoiseConfig = DenoiseConfig()
-    enhance: EnhanceConfig = EnhanceConfig()
+    illumination: IlluminationConfig = field(default_factory=IlluminationConfig)
+    denoise: DenoiseConfig = field(default_factory=DenoiseConfig)
+    enhance: EnhanceConfig = field(default_factory=EnhanceConfig)
 
 
 def _get_backend(name: str, device: str, model_dir: Optional[str]):
