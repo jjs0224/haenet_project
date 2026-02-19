@@ -22,9 +22,6 @@ from backend.app.common.service.ai_member_info import build_user_profile_payload
 # community_recommend
 from backend.app.models.community_recommend import CommunityRecommend
 
-# ai
-from AI.journal_assistant.pipeline.orchestrator import run_orchestrator
-
 # 파일 저장(공통)
 from backend.app.common.service.file_upload_service import (
     save_permanent_bytes,
@@ -179,6 +176,11 @@ async def persist_step2_from_image_bytes(db: Session, total_data: Dict[str, Any]
 # 등록 Step2 (기존 동기 생성 경로도 공용함수 사용하도록 정리)
 # ---------------------------------------------------------------------
 async def create_step2(db: Session, total_data: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        from AI.journal_assistant.pipeline.orchestrator import run_orchestrator
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"AI module unavailable: {type(e).__name__}: {e}")
+
     ai_payload = {
         "template": {
             "template_id": total_data.get("template_id"),
