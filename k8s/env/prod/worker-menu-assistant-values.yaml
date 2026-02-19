@@ -1,6 +1,6 @@
 image:
     repository: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-worker-gpu
-    tag: "sha-f7ae93ae958791a9aced2d2bb50fe95243a89b72"
+    tag: "sha-4c945d559bbd7b65616da1897839c134cbffdcc9"
     pullPolicy: IfNotPresent
 
 env:
