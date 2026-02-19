@@ -79,6 +79,7 @@ class ChromaMenuRetriever:
 
         self._client = None
         self._collection = None
+        self._variant_to_confirmed: Dict[str, ConfirmedMenu] = {}
 
     def _init(self) -> None:
         if self._collection is not None:
@@ -110,6 +111,69 @@ class ChromaMenuRetriever:
                     f"[RAG] collection is empty. chroma_dir={self.chroma_dir} collection={self.collection_name}"
                 )
 
+        self._build_variant_alias_map()
+
+    def _build_variant_alias_map(self) -> None:
+        self._variant_to_confirmed = {}
+        coll = self._collection
+        if coll is None:
+            return
+
+        try:
+            total = int(coll.count())
+        except Exception:
+            total = 0
+
+        if total <= 0:
+            return
+
+        page_size = 2000
+        for offset in range(0, total, page_size):
+            try:
+                got = coll.get(limit=page_size, offset=offset, include=["metadatas"])
+            except Exception:
+                # Fallback for environments where offset is not available/reliable.
+                if offset > 0:
+                    break
+                got = coll.get(limit=total, include=["metadatas"])
+
+            ids = got.get("ids") or []
+            mds = got.get("metadatas") or []
+            if not ids or not mds:
+                continue
+
+            for i, md in enumerate(mds):
+                if not isinstance(md, dict):
+                    continue
+                menu_md = _norm_ws(str(md.get("menu", "")))
+                if not menu_md:
+                    continue
+                menu_id = str(ids[i]) if i < len(ids) else f"idx_{offset+i}"
+                base = ConfirmedMenu(
+                    menu_id=menu_id,
+                    menu=menu_md,
+                    ingredients=_split_csv_like(md.get("ingredients")),
+                    alg_tags=_split_csv_like(md.get("alg_tags")),
+                    matched_variant="",
+                    menu_description_ko=str(md.get("menu_description_ko") or "").strip(),
+                )
+
+                for v in _split_csv_like(md.get("variants")):
+                    vn = _norm_ws(v)
+                    if not vn:
+                        continue
+                    key = vn.casefold()
+                    # Keep first mapping when conflicts exist.
+                    if key not in self._variant_to_confirmed:
+                        self._variant_to_confirmed[key] = ConfirmedMenu(
+                            menu_id=base.menu_id,
+                            menu=base.menu,
+                            ingredients=base.ingredients,
+                            alg_tags=base.alg_tags,
+                            matched_variant=vn,
+                            menu_description_ko=base.menu_description_ko,
+                        )
+
     @property
     def collection(self):
         self._init()
@@ -139,6 +203,11 @@ class ChromaMenuRetriever:
                     )
         except Exception:
             pass
+
+        # 1.5) deterministic variants exact (alias -> canonical)
+        alias_hit = self._variant_to_confirmed.get(q.casefold())
+        if alias_hit is not None:
+            return alias_hit
 
         # 2) fallback: semantic query then exact scan
         try:

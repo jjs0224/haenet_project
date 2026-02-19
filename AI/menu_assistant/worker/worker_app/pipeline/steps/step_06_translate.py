@@ -423,6 +423,9 @@ def main() -> None:
         action="store_true",
         help="If set, translate even if *_en already exists (cache still applies).",
     )
+    # Orchestrator compatibility flags (accepted for CLI compatibility, unused here).
+    parser.add_argument("--parallel_singles", action="store_true")
+    parser.add_argument("--max_workers", type=int, default=4)
 
     args = parser.parse_args()
 

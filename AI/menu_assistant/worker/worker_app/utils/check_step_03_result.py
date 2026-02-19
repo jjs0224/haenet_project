@@ -83,6 +83,27 @@ def show_items(items: List[Dict[str, Any]], keywords: Optional[List[str]] = None
         print("(no matches)")
 
 
+def show_structured_items(items: List[Dict[str, Any]], keywords: Optional[List[str]] = None, limit: int = 30) -> None:
+    """
+    Print raw structured item dictionaries (JSON) for quick debugging.
+    """
+    print("\n=== ITEMS (structured sample) ===")
+    cnt = 0
+    for i, it in enumerate(items):
+        raw_menu = str(it.get("raw_menu", "") or "")
+        menu_norm = str(it.get("menu_norm", "") or "")
+        if not _match_keywords([raw_menu, menu_norm], keywords):
+            continue
+
+        print(f"- {i:>3} | {json.dumps(it, ensure_ascii=False)}")
+        cnt += 1
+        if cnt >= limit:
+            break
+
+    if cnt == 0:
+        print("(no matches)")
+
+
 def main():
     import argparse
 
@@ -91,6 +112,7 @@ def main():
     p.add_argument("--keywords", nargs="*", default=None, help="optional keywords to filter outputs")
     p.add_argument("--limit", type=int, default=30, help="max rows to print in sample")
     p.add_argument("--no-sample", action="store_true", help="print summary only")
+    p.add_argument("--show-structured", action="store_true", help="print structured JSON sample")
 
     args = p.parse_args()
 
@@ -98,7 +120,10 @@ def main():
     summary(data)
 
     if not args.no_sample:
-        show_items(data.get("items", []) or [], keywords=args.keywords, limit=args.limit)
+        if args.show_structured:
+            show_structured_items(data.get("items", []) or [], keywords=args.keywords, limit=args.limit)
+        else:
+            show_items(data.get("items", []) or [], keywords=args.keywords, limit=args.limit)
 
 
 if __name__ == "__main__":

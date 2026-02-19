@@ -1407,7 +1407,8 @@
     "id": "rep_0098",
     "menu": "고구마치즈돈가스",
     "variants": [
-      "고구마치즈돈가스"
+      "고구마치즈돈가스",
+      "고구마치즈돈까스"
     ],
     "alg_tags": [
       "ALG_MILK"
@@ -2337,7 +2338,8 @@
       "규카츠",
       "돈까스",
       "돈카츠",
-      "카츠"
+      "카츠",
+      "돈가스"
     ],
     "alg_tags": [
       "ALG_CEREALS_GLUTEN"
@@ -4391,7 +4393,8 @@
     "id": "rep_0320",
     "menu": "돌솥비빔밥",
     "variants": [
-      "돌솥비빔밥"
+      "돌솥비빔밥",
+      "돌솔비빙밥"
     ],
     "alg_tags": [],
     "menu_description_ko": "돌솥비빔밥은 대표 재료를 활용한 메뉴입니다.",
@@ -11194,11 +11197,14 @@
     "id": "rep_0836",
     "menu": "비빔밥",
     "variants": [
-      "비빔밥"
+      "비빔밥",
+      "비빙밥"
     ],
     "alg_tags": [],
     "menu_description_ko": "비빔밥은 대표 재료를 활용한 메뉴입니다.",
-    "ingredients": []
+    "ingredients": ["carrot",
+    "rice"
+    ]
   },
   {
     "id": "rep_0838",
@@ -19254,7 +19260,8 @@
       "치즈돈돈카츠",
       "치즈돈카츠",
       "치즈카츠",
-      "카츠"
+      "카츠",
+      "돈가스"
     ],
     "alg_tags": [
       "ALG_MILK"
@@ -19501,7 +19508,8 @@
       "치즈돈까스",
       "치즈돈카츠",
       "치즈카츠",
-      "카츠"
+      "카츠",
+      "돈가스"
     ],
     "alg_tags": [
       "ALG_MILK"
@@ -22685,7 +22693,8 @@
       "카츠",
       "피자돈까스",
       "피자돈카츠",
-      "피자카츠"
+      "피자카츠",
+      "돈가스"
     ],
     "alg_tags": [
       "ALG_CEREALS_GLUTEN"
@@ -24071,7 +24080,8 @@
     "ingredients": [
       "Soybean",
       "Crab",
-      "Shrimp"
+      "Shrimp",
+      "tofu"
     ]
   },
   {
@@ -25792,7 +25802,8 @@
     "id": "rep_1950",
     "menu": "뚝배기불고기",
     "variants": [
-      "뚝배기불고기"
+      "뚝배기불고기",
+      "뜻배기불고기"
     ],
     "alg_tags": [],
     "menu_description_ko": "뚝배기불고기는 대표 재료를 활용한 메뉴입니다.",
@@ -26856,6 +26867,160 @@
       "Beer",
       "Barley",
       "Wheat"
+    ]
+  },
+  {
+    "id": "rep_2035",
+    "menu": "돈까스",
+    "variants": [
+      "돈까스",
+      "돈가스",
+      "돈카츠",
+      "돈까쓰",
+      "카츠",
+      "포크커틀릿"
+    ],
+    "alg_tags": [
+      "ALG_CEREALS_GLUTEN",
+      "ALG_EGG"
+    ],
+    "menu_description_ko": "돈까스(돈가스)는 돼지고기(또는 고기)를 빵가루에 묻혀 튀긴 커틀릿(카츠) 요리입니다.",
+    "ingredients": [
+      "Wheat",
+      "Egg"
+    ]
+  },
+  {
+    "id": "rep_2036",
+    "menu": "치즈돈까스",
+    "variants": [
+      "치즈돈까스",
+      "치즈돈가스",
+      "치즈돈카츠",
+      "치즈카츠"
+    ],
+    "alg_tags": [
+      "ALG_MILK",
+      "ALG_CEREALS_GLUTEN",
+      "ALG_EGG"
+    ],
+    "menu_description_ko": "치즈돈까스는 돈까스 안(또는 위)에 치즈를 넣거나 올려 튀긴 카츠 메뉴입니다.",
+    "ingredients": [
+      "Cheese",
+      "Milk",
+      "Wheat",
+      "Egg"
+    ]
+  },
+  {
+    "id": "rep_2037",
+    "menu": "고구마치즈돈까스",
+    "variants": [
+      "고구마치즈돈까스",
+      "고구마치즈돈가스"
+    ],
+    "alg_tags": [
+      "ALG_MILK",
+      "ALG_CEREALS_GLUTEN",
+      "ALG_EGG"
+    ],
+    "menu_description_ko": "고구마치즈돈까스는 고구마와 치즈를 활용한 돈까스(카츠) 메뉴입니다.",
+    "ingredients": [
+      "Cheese",
+      "Milk",
+      "Wheat",
+      "Egg"
+    ]
+  },
+  {
+    "id": "rep_2038",
+    "menu": "왕돈까스",
+    "variants": [
+      "왕돈까스",
+      "왕돈가스",
+      "왕돈카츠",
+      "빅돈까스"
+    ],
+    "alg_tags": [
+      "ALG_CEREALS_GLUTEN",
+      "ALG_EGG"
+    ],
+    "menu_description_ko": "왕돈까스는 일반 돈까스보다 크기가 큰 카츠 메뉴입니다.",
+    "ingredients": [
+      "Wheat",
+      "Egg"
+    ]
+  },
+  {
+    "id": "rep_2039",
+    "menu": "참치찌개",
+    "variants": [
+      "참치찌개",
+      "참치 김치찌개",
+      "참치김치찌개"
+    ],
+    "alg_tags": [],
+    "menu_description_ko": "참치찌개는 참치와 채소 등을 넣어 끓인 찌개 요리입니다.",
+    "ingredients": []
+  },
+  {
+    "id": "rep_2040",
+    "menu": "김치덮밥",
+    "variants": [
+      "김치덮밥",
+      "김치 덮밥"
+    ],
+    "alg_tags": [],
+    "menu_description_ko": "김치덮밥은 볶은 김치 등을 밥 위에 올려 먹는 덮밥입니다.",
+    "ingredients": []
+  },
+  {
+    "id": "rep_2041",
+    "menu": "철판김치볶음밥",
+    "variants": [
+      "철판김치볶음밥",
+      "김치볶음밥",
+      "철판 김치볶음밥"
+    ],
+    "alg_tags": [],
+    "menu_description_ko": "철판김치볶음밥은 뜨거운 철판에서 김치와 밥을 볶아낸 볶음밥입니다.",
+    "ingredients": []
+  },
+  {
+    "id": "rep_2042",
+    "menu": "해물알탕",
+    "variants": [
+      "해물알탕",
+      "알탕",
+      "해물 알탕"
+    ],
+    "alg_tags": [],
+    "menu_description_ko": "해물알탕은 생선 알(알)과 해물, 채소 등을 넣어 끓인 탕 요리입니다.",
+    "ingredients": []
+  },
+  {
+    "id": "rep_2043",
+    "menu": "양푼비빔밥",
+    "variants": [
+      "양푼비빔밥",
+      "양문비빙밥",
+      "양푼비빙밥",
+      "양푼 비빔밥"
+    ],
+    "alg_tags": [],
+    "menu_description_ko": "양푼비빔밥은 큰 그릇(양푼)에 밥과 나물, 양념 등을 넣어 비벼 먹는 비빔밥입니다.",
+    "ingredients": []
+  },
+  {
+    "id": "rep_2044",
+    "menu": "순두부",
+    "variants": [
+      "준두부"
+      ],
+    "alg_tags": ["ALG_SOY"],
+    "menu_description_ko": "부드러운 순두부를 주재료로 하여 얼큰하게 끓여낸 찌개입니다. 다양한 해산물이나 고기가 추가될 수 있습니다.",
+    "ingredients": [
+      "tofu"
     ]
   }
 ]

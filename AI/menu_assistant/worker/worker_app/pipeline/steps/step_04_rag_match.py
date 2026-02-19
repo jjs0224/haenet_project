@@ -53,12 +53,10 @@ def run_step(run_dir: Path) -> Path:
     out_items: List[Dict[str, Any]] = []
     stats = {"TOTAL": 0, "EXACT": 0, "UNKNOWN": 0}
 
-    # 기존: for it in items:
     for idx, it in enumerate(items, start=1):
         if not isinstance(it, dict):
             continue
 
-        # ✅ item_id 자동 생성 (없거나 null/빈값이면 순번 부여)
         src_item_id = it.get("item_id", None)
         if src_item_id is None or (isinstance(src_item_id, str) and src_item_id.strip() == ""):
             item_id = f"itm_{idx:04d}"  # itm_0001, itm_0002 ...
@@ -81,14 +79,31 @@ def run_step(run_dir: Path) -> Path:
         if match_status != "exact":
             match_status = "unknown"
 
+        # If query matched a variant alias, normalize to canonical menu name.
+        confirmed = res.get("confirmed") if isinstance(res, dict) else None
+        matched_variant = (
+            str((confirmed or {}).get("matched_variant") or "").strip()
+            if isinstance(confirmed, dict)
+            else ""
+        )
+        canonical_menu = (
+            str((confirmed or {}).get("menu") or "").strip()
+            if isinstance(confirmed, dict)
+            else ""
+        )
+        resolved_menu_norm = menu_norm
+        if match_status == "exact" and matched_variant and canonical_menu:
+            resolved_menu_norm = canonical_menu
+
         out_item: Dict[str, Any] = {
-            "item_id": item_id,  # ✅ 여기 null 대신 보장
+            "item_id": item_id,
             "raw_menu": raw_menu,
             "poly": _pick_poly(it),
-            "menu_norm": menu_norm,
+            "menu_norm": resolved_menu_norm,
+            "menu_norm_original": menu_norm,
             "match_status": match_status,
+            "resolved_by_variant": bool(matched_variant) if match_status == "exact" else False,
             "confirmed": res.get("confirmed") if match_status == "exact" else None,
-
         }
 
         out_items.append(out_item)

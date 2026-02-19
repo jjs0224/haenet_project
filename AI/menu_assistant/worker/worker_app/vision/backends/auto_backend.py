@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
@@ -28,6 +28,14 @@ class AutoConfig:
     # if DocUNet couldn't find quad, allow DewarpNet as "rescue" when trigger is high
     allow_dewarp_when_docunet_failed: bool = True
 
+    # conservative rotation gate for auto mode:
+    # if DocUNet orientation looks unreliable, rerun DocUNet with orientation disabled.
+    conservative_rotation_gate: bool = True
+    min_rotation_confidence: float = 0.97
+    min_rotation_score_margin: float = 300.0
+    disallow_180_without_very_high_conf: bool = True
+    min_conf_for_180: float = 0.995
+
 
 class AutoBackend(RectifyBackend):
     name = "auto"
@@ -49,9 +57,74 @@ class AutoBackend(RectifyBackend):
         self._docunet = DocUNetBackend(device=device, model_dir=model_dir, config=self.docunet_cfg)
         self._dewarpnet = DewarpNetBackend(device=device, model_dir=model_dir, config=self.dewarpnet_cfg)
 
+    def _rotation_is_trusted(self, doc_meta: Dict[str, Any]) -> bool:
+        orient = (doc_meta or {}).get("orientation", {}) or {}
+
+        # No orientation rotation was applied, so there is nothing to distrust.
+        if not bool(orient.get("applied", False)):
+            return True
+
+        try:
+            angle = int(orient.get("correction_angle", 0) or 0)
+        except Exception:
+            return False
+
+        conf = orient.get("confidence", None)
+        predictor_available = bool(orient.get("predictor_available", False))
+        if (not predictor_available) or (not isinstance(conf, (int, float))):
+            return False
+
+        conf = float(conf)
+        if conf < float(self.auto_cfg.min_rotation_confidence):
+            return False
+
+        if (
+            self.auto_cfg.disallow_180_without_very_high_conf
+            and angle == 180
+            and conf < float(self.auto_cfg.min_conf_for_180)
+        ):
+            return False
+
+        scored = (((orient.get("fallback", {}) or {}).get("scored", [])) or [])
+        score0 = None
+        score_angle = None
+        for row in scored:
+            try:
+                a = int(row.get("angle", -1))
+                s = float(row.get("score", 0.0))
+            except Exception:
+                continue
+            if a == 0:
+                score0 = s
+            if a == angle:
+                score_angle = s
+
+        if (score0 is not None) and (score_angle is not None):
+            if (score_angle - score0) < float(self.auto_cfg.min_rotation_score_margin):
+                return False
+
+        return True
+
     def rectify(self, image_bgr: np.ndarray) -> RectifyResult:
         # 1) DocUNet first
         res_u = self._docunet.rectify(image_bgr)
+
+        rotation_guard: Dict[str, Any] = {}
+        if self.auto_cfg.conservative_rotation_gate:
+            trusted = self._rotation_is_trusted(res_u.meta)
+            rotation_guard = {
+                "enabled": True,
+                "trusted": bool(trusted),
+            }
+            if not trusted:
+                cfg_no_rot = replace(self.docunet_cfg, enable_orientation=False)
+                res_u = DocUNetBackend(device=self.device, model_dir=self.model_dir, config=cfg_no_rot).rectify(image_bgr)
+                rotation_guard["rerun_without_orientation"] = True
+                rotation_guard["reason"] = "docunet_orientation_not_trusted"
+            else:
+                rotation_guard["rerun_without_orientation"] = False
+        else:
+            rotation_guard = {"enabled": False}
 
         # 2) Compute trigger score on DocUNet output image (or input if docunet failed)
         trig = compute_dewarp_trigger(res_u.image)
@@ -65,10 +138,16 @@ class AutoBackend(RectifyBackend):
                     "trigger_threshold": self.auto_cfg.trigger_threshold,
                     "min_score_gain": self.auto_cfg.min_score_gain,
                     "allow_dewarp_when_docunet_failed": self.auto_cfg.allow_dewarp_when_docunet_failed,
+                    "conservative_rotation_gate": self.auto_cfg.conservative_rotation_gate,
+                    "min_rotation_confidence": self.auto_cfg.min_rotation_confidence,
+                    "min_rotation_score_margin": self.auto_cfg.min_rotation_score_margin,
+                    "disallow_180_without_very_high_conf": self.auto_cfg.disallow_180_without_very_high_conf,
+                    "min_conf_for_180": self.auto_cfg.min_conf_for_180,
                 },
                 "trigger": trig,
                 "selected": "docunet",
                 "decision": {},
+                "rotation_guard": rotation_guard,
             },
             "docunet_meta": res_u.meta,
             "dewarpnet_meta": None,
