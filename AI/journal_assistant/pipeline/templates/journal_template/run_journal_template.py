@@ -75,38 +75,68 @@ def _to_pil_rgba(base_png: object) -> Image.Image:
     raise TypeError(f"base_png must be bytes/bytearray/memoryview/file-like or PIL.Image, got: {type(base_png)!r}")
 
 
-def _compose_final(base_png: object, paragraph: str) -> bytes:
+def _compose_final(base_png, paragraph: str) -> bytes:
+    # 1) bytes -> PIL Image (bytes.convert 에러 방지)
+    if isinstance(base_png, memoryview):
+        base_png = base_png.tobytes()
 
-    if isinstance(base_png, (bytes, bytearray, memoryview)):
-        base = Image.open(BytesIO(bytes(base_png))).convert("RGBA")
+    if isinstance(base_png, (bytes, bytearray)):
+        img = Image.open(io.BytesIO(base_png)).convert("RGBA")
+    elif isinstance(base_png, Image.Image):
+        img = base_png.convert("RGBA")
     else:
-        base = base_png.convert("RGBA")
-
-    """
-    base_png: PNG bytes 또는 PIL.Image
-    paragraph: 하단 텍스트
-    return: 최종 PNG bytes
-    """
-
-    # ✅ 여기서 무조건 PIL로 변환(이걸로 bytes.convert 에러 100% 제거)
-    img = _to_pil_rgba(base_png)
+        # file-like 지원
+        if hasattr(base_png, "read"):
+            data = base_png.read()
+            img = Image.open(io.BytesIO(data)).convert("RGBA")
+        else:
+            raise TypeError(f"base_png type not supported: {type(base_png)}")
 
     w, h = img.size
     draw = ImageDraw.Draw(img)
 
-    # --- settings ---
-    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 32)
+    # 2) 폰트는 무조건 기본 폰트만 (truetype 전부 제거)
+    font = ImageFont.load_default()
+
+    # 박스/레이아웃
     side_margin = int(w * 0.07)
     bottom_margin = int(h * 0.06)
-    padding_x = 32
-    padding_y = 22
-    radius = 22
+    padding_x = 20
+    padding_y = 14
+    radius = 18
+    spacing = 6
 
-    # wrap
-    lines = textwrap.wrap((paragraph or "").strip(), width=28)
-    text = "\n".join(lines) if lines else (paragraph or "").strip()
+    text_raw = (paragraph or "").strip()
+    if not text_raw:
+        text_raw = " "
 
-    bbox = draw.multiline_textbbox((0, 0), text, font=font, spacing=8, align="left")
+    # 3) 간단 wrap (기본 폰트는 측정이 애매해서 폭 기준으로 단순화)
+    #    너무 길면 자동 줄바꿈되게만 처리
+    max_text_width = w - (side_margin * 2) - (padding_x * 2)
+
+    words = text_raw.split()
+    lines = []
+    cur = ""
+    for word in words:
+        test = (cur + " " + word).strip()
+        try:
+            tw = draw.textlength(test, font=font)
+        except Exception:
+            # textlength가 없는 PIL 버전 대비
+            tw = draw.textbbox((0, 0), test, font=font)[2]
+
+        if tw <= max_text_width or not cur:
+            cur = test
+        else:
+            lines.append(cur)
+            cur = word
+    if cur:
+        lines.append(cur)
+
+    text = "\n".join(lines)
+
+    # 4) 텍스트 bbox 계산 -> 텍스트 크기만큼 박스 생성
+    bbox = draw.multiline_textbbox((0, 0), text, font=font, spacing=spacing, align="left")
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
 
@@ -118,24 +148,24 @@ def _compose_final(base_png: object, paragraph: str) -> bytes:
     box_y1 = box_y2 - box_h
     box_x2 = box_x1 + box_w
 
+    # 5) 박스 + 텍스트 렌더
     draw.rounded_rectangle(
         (box_x1, box_y1, box_x2, box_y2),
         radius=radius,
         fill=(255, 255, 255, 235),
     )
 
-    text_x = box_x1 + padding_x
-    text_y = box_y1 + padding_y
     draw.multiline_text(
-        (text_x, text_y),
+        (box_x1 + padding_x, box_y1 + padding_y),
         text,
         font=font,
         fill=(20, 20, 20, 255),
-        spacing=8,
+        spacing=spacing,
         align="left",
     )
 
-    out = BytesIO()
+    # 6) PNG bytes로 반환
+    out = io.BytesIO()
     img.save(out, format="PNG")
     return out.getvalue()
 
