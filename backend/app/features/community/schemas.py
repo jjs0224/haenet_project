@@ -21,6 +21,7 @@ class CommunityRead(BaseModel):
     updated_at: Optional[str] = None
     image_urls: List[str] = Field(default_factory=list)
     latest_comment_text: Optional[str] = None  # 댓글
+    latest_comment_nickname: Optional[str] = None
 
 class CommunityListRead(BaseModel):
     community_id: int
