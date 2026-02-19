@@ -76,6 +76,12 @@ def _to_pil_rgba(base_png: object) -> Image.Image:
 
 
 def _compose_final(base_png: object, paragraph: str) -> bytes:
+
+    if isinstance(base_png, (bytes, bytearray, memoryview)):
+        base = Image.open(BytesIO(bytes(base_png))).convert("RGBA")
+    else:
+        base = base_png.convert("RGBA")
+
     """
     base_png: PNG bytes 또는 PIL.Image
     paragraph: 하단 텍스트

@@ -212,14 +212,29 @@ def main() -> None:
                 _set_job(r, job_id, "DONE", finished_at=_utc_now_iso(), result=result)
                 _log(f"[worker:{worker_id}] DONE job_id={job_id}")
             except Exception as e:
+                import traceback
+                tb = traceback.format_exc()
                 _set_job(
                     r,
                     job_id,
                     "FAILED",
                     finished_at=_utc_now_iso(),
-                    error={"type": type(e).__name__, "message": str(e)},
+                    error={
+                        "type": type(e).__name__,
+                        "message": str(e),
+                        "traceback": tb,  # ✅ 여기!
+                    },
                 )
                 _log(f"[worker:{worker_id}] FAILED job_id={job_id} err={type(e).__name__}: {e}")
+                _log(tb)
+                # _set_job(
+                #     r,
+                #     job_id,
+                #     "FAILED",
+                #     finished_at=_utc_now_iso(),
+                #     error={"type": type(e).__name__, "message": str(e)},
+                # )
+                # _log(f"[worker:{worker_id}] FAILED job_id={job_id} err={type(e).__name__}: {e}")
 
             r.lrem(processing_name, 1, raw)
 
