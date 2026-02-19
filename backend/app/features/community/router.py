@@ -62,7 +62,7 @@ def create_community(payload: CommunityCreate, db: Session = Depends(get_db), cu
     task_payload = {
         "ai_payload": ai_payload,
         "total_data": total_data,          # member_id 등 (DB는 안 쓰지만 업로드에 필요)
-        "community_id": community_id,      # ✅ 업로드 prefix용
+        "community_id": community_id,      # 업로드 prefix용
         "community_type": community_type,
         "template_id": int(total_data.get("template_id") or 0),
         "review_ids": list(payload.review_ids or []),
@@ -72,7 +72,7 @@ def create_community(payload: CommunityCreate, db: Session = Depends(get_db), cu
     try:
         job_id = enqueue_task(r, task="journal_generate_community", payload=task_payload)
 
-        # ✅ polling 시 backend가 finalize 할 수 있게 job hash에 메타 저장
+        # polling 시 backend가 finalize 할 수 있게 job hash에 메타 저장
         r.hset(
             f"cicdex:job:{job_id}",
             mapping={
@@ -106,7 +106,7 @@ def community_job_status(job_id: str, db: Session = Depends(get_db), current=Dep
     result = _parse_json(data.get("result"))
     error = _parse_json(data.get("error"))
 
-    # ✅ (B안 핵심) worker가 DONE이면 backend가 DB finalize(ImgFile + review available)
+    # (B안 핵심) worker가 DONE이면 backend가 DB finalize(ImgFile + review available)
     if status == "DONE" and result and data.get("finalized") != "1":
         try:
             community_id = int(data.get("community_id") or (result.get("community_id") or 0))

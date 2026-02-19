@@ -231,34 +231,32 @@ def list_community(
 ) -> List[Dict[str, Any]]:
 
     PostAuthor = aliased(Member)
-    CommentAuthor = aliased(Member)
 
-    # 최신 댓글 1개를 LATERAL로 뽑기 (content + member_id)
-    latest_comment_lateral = (
-        select(
-            Comment.content.label("latest_comment_text"),
-            Comment.member_id.label("latest_comment_member_id"),
-        )
+    latest_comment_text_sq = (
+        select(Comment.content)
         .where(Comment.community_id == Community.community_id)
         .order_by(Comment.comment_id.desc())
         .limit(1)
-        .lateral()
+        .scalar_subquery()
+    )
+
+    latest_comment_nickname_sq = (
+        select(Member.nickname)
+        .join(Comment, Comment.member_id == Member.member_id)
+        .where(Comment.community_id == Community.community_id)
+        .order_by(Comment.comment_id.desc())
+        .limit(1)
+        .scalar_subquery()
     )
 
     stmt = (
         select(
             Community,
             PostAuthor.nickname.label("post_nickname"),
-            latest_comment_lateral.c.latest_comment_text,
-            CommentAuthor.nickname.label("latest_comment_nickname"),
+            latest_comment_text_sq.label("latest_comment_text"),
+            latest_comment_nickname_sq.label("latest_comment_nickname"),
         )
         .join(PostAuthor, PostAuthor.member_id == Community.member_id)
-        # 최신댓글이 없을 수 있으니 OUTER JOIN, ON은 true()
-        .outerjoin(latest_comment_lateral, true())
-        .outerjoin(
-            CommentAuthor,
-            CommentAuthor.member_id == latest_comment_lateral.c.latest_comment_member_id,
-        )
     )
 
     if member_id is not None:
