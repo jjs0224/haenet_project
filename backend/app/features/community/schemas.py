@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Any, Optional, List
 from pydantic import BaseModel, Field
 
 
@@ -37,3 +37,18 @@ class CommunityListRead(BaseModel):
     
     # 저널 / 맵 구분
     community_type: Optional[str] = None
+
+
+class CommunityEnqueueResponse(BaseModel):
+    job_id: str
+    status: str
+    queued_at: str
+
+
+class CommunityJobResponse(BaseModel):
+    job_id: str
+    status: str
+    result: Optional[dict] = None
+    error: Optional[Any] = None
+    queued_at: Optional[str] = None
+    updated_at: Optional[str] = None
