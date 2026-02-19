@@ -1,8 +1,11 @@
 from __future__ import annotations
+
+import io
 import json
+import textwrap
 from io import BytesIO
 from typing import Dict, Any
-import textwrap
+
 from PIL import Image, ImageDraw, ImageFont
 
 from AI.journal_assistant.pipeline.generator import generate_text, generate_image
@@ -19,7 +22,7 @@ def _safe_json_load(s: str) -> Dict[str, Any]:
         a = s.find("{")
         b = s.rfind("}")
         if a != -1 and b != -1 and b > a:
-            return json.loads(s[a:b+1])
+            return json.loads(s[a:b + 1])
         raise
 
 
@@ -40,12 +43,52 @@ def _wrap_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, 
     return "\n".join(lines)
 
 
-def _compose_final(base_png: Image.Image, paragraph: str) -> Image.Image:
-    img = base_png.convert("RGBA")
+def _to_pil_rgba(base_png: object) -> Image.Image:
+    """
+    base_png가 어떤 형태로 오더라도(PNG bytes / bytearray / memoryview / BytesIO / PIL.Image)
+    안전하게 PIL.Image(RGBA)로 변환한다.
+    """
+    # PIL.Image면 그대로
+    if isinstance(base_png, Image.Image):
+        return base_png.convert("RGBA")
+
+    # memoryview 지원(운영에서 간혹 이런 타입으로 올 수 있음)
+    if isinstance(base_png, memoryview):
+        base_png = base_png.tobytes()
+
+    # bytes/bytearray면 BytesIO로 열기
+    if isinstance(base_png, (bytes, bytearray)):
+        try:
+            return Image.open(BytesIO(base_png)).convert("RGBA")
+        except Exception as e:
+            # PNG bytes가 깨졌거나, bytes가 이미지가 아닌 경우
+            raise RuntimeError(f"Invalid image bytes for PIL open: {type(e).__name__}: {e}")
+
+    # BytesIO 같은 file-like 객체도 지원
+    if hasattr(base_png, "read"):
+        try:
+            data = base_png.read()
+            return Image.open(BytesIO(data)).convert("RGBA")
+        except Exception as e:
+            raise RuntimeError(f"Invalid file-like image input: {type(e).__name__}: {e}")
+
+    raise TypeError(f"base_png must be bytes/bytearray/memoryview/file-like or PIL.Image, got: {type(base_png)!r}")
+
+
+def _compose_final(base_png: object, paragraph: str) -> bytes:
+    """
+    base_png: PNG bytes 또는 PIL.Image
+    paragraph: 하단 텍스트
+    return: 최종 PNG bytes
+    """
+
+    # ✅ 여기서 무조건 PIL로 변환(이걸로 bytes.convert 에러 100% 제거)
+    img = _to_pil_rgba(base_png)
+
     w, h = img.size
     draw = ImageDraw.Draw(img)
 
-    # --- settings (원래 쓰던 값 있으면 그걸로 교체) ---
+    # --- settings ---
     font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 32)
     side_margin = int(w * 0.07)
     bottom_margin = int(h * 0.06)
@@ -53,39 +96,28 @@ def _compose_final(base_png: Image.Image, paragraph: str) -> Image.Image:
     padding_y = 22
     radius = 22
 
-    # 1) wrap: 박스 폭 안에 들어갈 줄바꿈 만들기
-    max_text_width = w - (side_margin * 2) - (padding_x * 2)
+    # wrap
+    lines = textwrap.wrap((paragraph or "").strip(), width=28)
+    text = "\n".join(lines) if lines else (paragraph or "").strip()
 
-    # 대충 문자 개수로 자르는 게 아니라, textbbox 기반으로 줄바꿈하는 게 베스트지만
-    # 최소 수정이면 textwrap + bbox로 후검증 방식이 현실적.
-    # (네 코드가 이미 wrap을 하고 있으면 그 로직 유지)
-    lines = textwrap.wrap(paragraph.strip(), width=28)  # <= 너비 값은 폰트/이미지에 맞게 조절
-    text = "\n".join(lines) if lines else paragraph.strip()
-
-    # 2) 텍스트 bbox 계산 (높이/폭 정확히 구하기)
-    # PIL 버전 따라 multiline_textbbox가 없을 수 있어 textbbox로 대체 가능
     bbox = draw.multiline_textbbox((0, 0), text, font=font, spacing=8, align="left")
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
 
-    # 3) 박스 크기 = 텍스트 크기 + padding
     box_w = min(w - side_margin * 2, text_w + padding_x * 2)
     box_h = text_h + padding_y * 2
 
-    # 4) 박스 위치: 하단에 딱 붙이되 마진 유지
     box_x1 = (w - box_w) // 2
     box_y2 = h - bottom_margin
     box_y1 = box_y2 - box_h
     box_x2 = box_x1 + box_w
 
-    # 5) 박스 그리기 (rounded)
     draw.rounded_rectangle(
         (box_x1, box_y1, box_x2, box_y2),
         radius=radius,
         fill=(255, 255, 255, 235),
     )
 
-    # 6) 텍스트 그리기
     text_x = box_x1 + padding_x
     text_y = box_y1 + padding_y
     draw.multiline_text(
@@ -97,50 +129,9 @@ def _compose_final(base_png: Image.Image, paragraph: str) -> Image.Image:
         align="left",
     )
 
-    return img
-
-
-# def _compose_final(base_png: bytes, paragraph: str) -> bytes:
-#     """
-#     base_png: Gemini가 만든 이미지 (하단 30% 비어있는 상태가 이상적)
-#     paragraph: 밑에 그릴 텍스트
-#     """
-#     base = Image.open(BytesIO(base_png)).convert("RGBA")
-#     w, h = base.size
-#
-#     draw = ImageDraw.Draw(base)
-#
-#     # 폰트 (윈도우면 arial.ttf 잘 잡힘 / 서버면 fallback)
-#     try:
-#         font = ImageFont.truetype("arial.ttf", 36)
-#     except Exception:
-#         font = ImageFont.load_default()
-#
-#     # 하단 텍스트 영역
-#     left = int(w * 0.08)
-#     right = int(w * 0.92)
-#     top = int(h * 0.72)       # 하단 28% 정도
-#     max_width = right - left
-#
-#     wrapped = _wrap_text(draw, paragraph.strip(), font, max_width)
-#
-#     # 텍스트 배경 카드(가독성)
-#     pad = 18
-#     card = (left - pad, top - pad, right + pad, h - int(h * 0.06))
-#     draw.rounded_rectangle(card, radius=24, fill=(245, 245, 245, 235), outline=(220, 220, 220, 255), width=2)
-#
-#     draw.multiline_text(
-#         (left, top),
-#         wrapped,
-#         fill=(20, 20, 20, 255),
-#         font=font,
-#         spacing=10,
-#         align="left",
-#     )
-#
-#     out = BytesIO()
-#     base.save(out, format="PNG")
-#     return out.getvalue()
+    out = BytesIO()
+    img.save(out, format="PNG")
+    return out.getvalue()
 
 
 def run_journal_template(payload: Dict[str, Any]) -> bytes:
@@ -155,7 +146,7 @@ def run_journal_template(payload: Dict[str, Any]) -> bytes:
 
     character_spec = _safe_json_load(character_json_text)
 
-    # Agent2: paragraph
+    # Agent2: paragraph (또는 캐릭터 이름을 만들고 싶으면 여기 프롬프트를 이름 생성용으로 바꾸면 됨)
     p2 = build_character_copy_prompt(
         character_json=json.dumps(character_spec, ensure_ascii=False),
         nickname=nickname,
@@ -170,5 +161,5 @@ def run_journal_template(payload: Dict[str, Any]) -> bytes:
     if not base_png:
         raise RuntimeError("Journal base image generation failed (empty bytes).")
 
-    # Compose final
+    # Compose final (여기서 bytes.convert 에러 방지 완료)
     return _compose_final(base_png, paragraph)
