@@ -8,6 +8,7 @@ import os
 import signal
 import time
 import uuid
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -68,6 +69,66 @@ def _connect(redis_url: str) -> redis.Redis:
     return r
 
 
+def _get_s3_client():
+    try:
+        import boto3  # type: ignore
+    except Exception as e:
+        _log(f"[worker] warning: boto3 not available for S3 upload: {type(e).__name__}: {e}")
+        return None
+
+    region = os.getenv("S3_REGION") or os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION")
+    try:
+        return boto3.client("s3", region_name=region) if region else boto3.client("s3")
+    except Exception as e:
+        _log(f"[worker] warning: failed to create s3 client: {type(e).__name__}: {e}")
+        return None
+
+
+def _upload_rectified_image(run_dir: Path, run_id: str) -> Optional[Dict[str, Any]]:
+    bucket = os.getenv("S3_BUCKET") or ""
+    if not bucket:
+        _log("[worker] S3_BUCKET not set; skip rectified image upload")
+        return None
+
+    rectified_path = run_dir / "rectify" / "rectified.jpg"
+    if not rectified_path.exists():
+        _log(f"[worker] rectified image not found: {rectified_path}")
+        return None
+
+    client = _get_s3_client()
+    if client is None:
+        return None
+
+    prefix = os.getenv("MENU_ASSISTANT_IMAGE_S3_PREFIX") or os.getenv("S3_PREFIX") or "upload"
+    prefix = prefix.strip("/")
+    key = f"{prefix}/menu_assistant/rectified/{run_id}/rectified.jpg"
+
+    try:
+        client.upload_file(str(rectified_path), bucket, key, ExtraArgs={"ContentType": "image/jpeg"})
+    except Exception as e:
+        _log(f"[worker] rectified image upload failed: {type(e).__name__}: {e}")
+        return None
+
+    expires_in = int(os.getenv("MENU_ASSISTANT_IMAGE_URL_TTL", "3600"))
+    presigned_url = ""
+    try:
+        presigned_url = client.generate_presigned_url(
+            ClientMethod="get_object",
+            Params={"Bucket": bucket, "Key": key},
+            ExpiresIn=expires_in,
+        )
+    except Exception as e:
+        _log(f"[worker] presign failed for rectified image: {type(e).__name__}: {e}")
+
+    return {
+        "bucket": bucket,
+        "key": key,
+        "s3_uri": f"s3://{bucket}/{key}",
+        "presigned_url": presigned_url,
+        "expires_in": expires_in,
+    }
+
+
 def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     실제 AI 처리 로직 연결 지점.
@@ -83,7 +144,6 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     if task == "menu_assistant_pipeline":
         import base64
         import json as _json
-        from pathlib import Path
         from AI.menu_assistant.worker.worker_app.pipeline.orchestrator import (
             PipelineOrchestrator,
             Step5Options,
@@ -133,7 +193,19 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         result_path = run_dir / "final" / ("final_translated.json" if run_step6 else "final.json")
         if not result_path.exists():
             raise FileNotFoundError(f"Menu assistant result not found: {result_path}")
-        return _json.loads(result_path.read_text(encoding="utf-8"))
+        result = _json.loads(result_path.read_text(encoding="utf-8"))
+        if isinstance(result, dict):
+            resolved_run_id = str(run_id or result.get("run_id") or run_dir.name)
+            upload_info = _upload_rectified_image(run_dir, resolved_run_id)
+            if upload_info:
+                artifacts = result.get("artifacts")
+                if not isinstance(artifacts, dict):
+                    artifacts = {}
+                artifacts["rectified_image"] = upload_info
+                result["artifacts"] = artifacts
+                if upload_info.get("presigned_url"):
+                    result["rectified_image_url"] = upload_info["presigned_url"]
+        return result
 
     raise ValueError(f"Unsupported task: {task}")
 

@@ -18,6 +18,7 @@ from backend.app.models.member import Member
 
 # category, item 조회
 from backend.app.common.service.ai_member_info import build_user_profile_payload
+from backend.app.common.utils.util import resolve_asset_urls
 
 # community_recommend
 from backend.app.models.community_recommend import CommunityRecommend
@@ -165,7 +166,7 @@ async def persist_step2_from_image_bytes(db: Session, total_data: Dict[str, Any]
 
     return {
         "community_id": community_id,
-        "image_urls": [stored.storage_path] if stored else [],
+        "image_urls": resolve_asset_urls([stored.storage_path] if stored else []),
         "template_id": template_id,
         "reviews": total_data.get("reviews", []),
         "community_type": community.community_type,
@@ -281,7 +282,7 @@ def list_community(
             "recommend": int(c.recommend or 0),
             "created_at": c.create_at.isoformat() if getattr(c, "create_at", None) else None,
             "updated_at": c.update_at.isoformat() if getattr(c, "update_at", None) else None,
-            "image_urls": img_map.get(c.community_id, []),
+            "image_urls": resolve_asset_urls(img_map.get(c.community_id, [])),
             "latest_comment_text": latest_comment_text,
             "latest_comment_nickname": latest_comment_nickname,
             "community_type": c.community_type,
@@ -319,7 +320,7 @@ def get_community_detail(db: Session, community_id: int, *, member_id: Optional[
         .order_by(ImgFile.sort_order.asc())
     ).scalars().all()
 
-    image_urls = [img.storage_path for img in img_rows]
+    image_urls = resolve_asset_urls([img.storage_path for img in img_rows])
 
     return {
         "community_id": c.community_id,
