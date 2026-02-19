@@ -1,3 +1,18 @@
-host: app.example.com
+host: foodray.net
 apiServiceName: api-prod
 frontendServiceName: frontend-prod
+
+ingress:
+    enabled: false
+    className: alb
+    frontendHost: foodray.net
+    apiHost: api.foodray.net
+    annotations:
+        alb.ingress.kubernetes.io/scheme: internet-facing
+        alb.ingress.kubernetes.io/target-type: ip
+        alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+        alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:690641653744:certificate/4114d219-b52b-4b56-921b-b2067fd1a3c0
+        alb.ingress.kubernetes.io/ssl-redirect: "443"
+        alb.ingress.kubernetes.io/group.name: foodray
+        alb.ingress.kubernetes.io/load-balancer-name: foodray-alb
+        alb.ingress.kubernetes.io/healthcheck-path: /health
