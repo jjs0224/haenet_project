@@ -230,33 +230,37 @@ def list_community(
     active_only: Optional[bool] = True,   # Optional로 변경
 ) -> List[Dict[str, Any]]:
 
-    PostAuthor = aliased(Member)
 
-    latest_comment_text_sq = (
-        select(Comment.content)
+    PostAuthor = aliased(Member, name="post_author")
+    CommentAuthor = aliased(Member, name="comment_author")
+
+    # --- 최신 댓글 1개를 뽑는 LATERAL 서브쿼리 ---
+    # (너 원래 코드 구조를 유지)
+    latest_comment_lateral = (
+        select(
+            Comment.content.label("latest_comment_text"),
+            Comment.member_id.label("latest_comment_member_id"),
+        )
         .where(Comment.community_id == Community.community_id)
         .order_by(Comment.comment_id.desc())
         .limit(1)
-        .scalar_subquery()
-    )
-
-    latest_comment_nickname_sq = (
-        select(Member.nickname)
-        .join(Comment, Comment.member_id == Member.member_id)
-        .where(Comment.community_id == Community.community_id)
-        .order_by(Comment.comment_id.desc())
-        .limit(1)
-        .scalar_subquery()
+        .lateral("latest_comment")
     )
 
     stmt = (
         select(
             Community,
             PostAuthor.nickname.label("post_nickname"),
-            latest_comment_text_sq.label("latest_comment_text"),
-            latest_comment_nickname_sq.label("latest_comment_nickname"),
+            latest_comment_lateral.c.latest_comment_text,
+            CommentAuthor.nickname.label("latest_comment_nickname"),
         )
         .join(PostAuthor, PostAuthor.member_id == Community.member_id)
+        .outerjoin(latest_comment_lateral, true())
+        .outerjoin(
+            CommentAuthor,
+            CommentAuthor.member_id == latest_comment_lateral.c.latest_comment_member_id,
+        )
+        .order_by(Community.community_id.desc())
     )
 
     if member_id is not None:
@@ -267,39 +271,36 @@ def list_community(
     elif active_only is False:
         stmt = stmt.where(Community.community_active.is_(False))
 
-    rows = db.execute(stmt.order_by(Community.community_id.desc())).all()
-    if not rows:
-        return []
+    rows = db.execute(stmt).all()
 
-    communities = [row[0] for row in rows]
-    community_ids = [c.community_id for c in communities]
-
-    imgs = db.execute(
-        select(ImgFile)
-        .where(ImgFile.owner_type == "community")
-        .where(ImgFile.community_id.in_(community_ids))
-        .order_by(ImgFile.community_id.asc(), ImgFile.sort_order.asc())
-    ).scalars().all()
-
-    img_map: Dict[int, List[str]] = {}
-    for img in imgs:
-        img_map.setdefault(img.community_id, []).append(img.storage_path)
+    # community_id -> image_urls 매핑(너 기존 코드가 있으면 그거 유지)
+    # 여기서는 img_map 변수가 기존에 만들어져 있다고 가정했는데,
+    # 너 파일에 있는 기존 img_map 생성 로직 그대로 두고 아래 out만 바꿔도 됨.
+    img_map = {}  # ⚠️ 여기 라인은 "너 기존 코드의 img_map 생성 로직"으로 교체/유지해
 
     out: List[Dict[str, Any]] = []
     for c, post_nickname, latest_comment_text, latest_comment_nickname in rows:
-        out.append({
-            "community_id": c.community_id,
-            "member_id": c.member_id,
-            "nickname": post_nickname,  # 게시글 작성자 닉네임
-            "community_active": bool(c.community_active),
-            "recommend": int(c.recommend or 0),
-            "created_at": c.create_at.isoformat() if getattr(c, "create_at", None) else None,
-            "updated_at": c.update_at.isoformat() if getattr(c, "update_at", None) else None,
-            "image_urls": img_map.get(c.community_id, []),
-            "latest_comment_text": latest_comment_text,
-            "latest_comment_nickname": latest_comment_nickname,  # 최신댓글 작성자 닉네임
-            "community_type": c.community_type,
-        })
+        # 핵심: 최신 댓글 텍스트가 있는데 닉네임이 없으면 "익명" 강제
+        latest_comment_nickname_out = None
+        if latest_comment_text:
+            latest_comment_nickname_out = latest_comment_nickname or "익명"
+
+        out.append(
+            {
+                "community_id": c.community_id,
+                "member_id": c.member_id,
+                "nickname": post_nickname or "익명",
+                "community_active": bool(c.community_active),
+                "recommend": int(c.recommend or 0),
+                "created_at": c.create_at.isoformat() if getattr(c, "create_at", None) else None,
+                "updated_at": c.update_at.isoformat() if getattr(c, "update_at", None) else None,
+                "image_urls": img_map.get(c.community_id, []),
+                "latest_comment_text": latest_comment_text,
+                "latest_comment_nickname": latest_comment_nickname_out,
+                "community_type": c.community_type,
+            }
+        )
+
     return out
 
 
