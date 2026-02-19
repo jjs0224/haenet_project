@@ -61,6 +61,21 @@ FROM ${BASE_IMAGE:-fallback-runtime} AS runtime
 WORKDIR /app
 
 COPY . /app
+ARG BUILD_CHROMA_INDEX=0
+ARG CHROMA_DATASET_PATH=/app/AI/menu_assistant/data/datasets/raw/menu_seed.json
+ARG CHROMA_DIR=/app/AI/menu_assistant/data/chroma
+ARG CHROMA_COLLECTION=menu_index
+ARG CHROMA_EMBED_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+
+RUN if [ "$BUILD_CHROMA_INDEX" = "1" ]; then \
+      python /app/AI/menu_assistant/worker/scripts/build_chroma_index.py \
+        --dataset "$CHROMA_DATASET_PATH" \
+        --chroma_dir "$CHROMA_DIR" \
+        --collection "$CHROMA_COLLECTION" \
+        --embed_model "$CHROMA_EMBED_MODEL"; \
+      chown -R 10001:10001 "$CHROMA_DIR" || true; \
+    fi
+
 ENV PYTHONPATH=/app
 USER appuser
 

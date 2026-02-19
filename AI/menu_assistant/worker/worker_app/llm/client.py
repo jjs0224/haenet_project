@@ -16,7 +16,7 @@ class GeminiClientConfig:
     api_key_env: str = "GEMINI_API_KEY"
     temperature: float = 0.2
     top_p: float = 0.95
-    top_k: int = 20
+    top_k: int = 40
     response_mime_type: str = "application/json"
 
 

@@ -130,6 +130,8 @@ jobs:
             BASE_IMAGE=${{ env.WORKER_BASE_IMAGE }}
             WORKER_REQUIREMENTS=requirements_cu.txt
             PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu126
+            BUILD_CHROMA_INDEX=1
+            CHROMA_DATASET_PATH=/app/AI/menu_assistant/data/datasets/raw/menu_seed_with_alg_tags_variants_v3.json
           cache-from: type=gha,scope=worker-app
           cache-to: type=gha,mode=max,scope=worker-app
 
