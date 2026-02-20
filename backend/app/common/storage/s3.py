@@ -115,6 +115,13 @@ class S3UploadStorage:
 
         self.client.put_object(Bucket=self.bucket, Key=key, Body=data, ContentType=mime)
 
+        try:
+            self.client.head_object(Bucket=self.bucket, Key=key)
+        except Exception as e:
+            raise RuntimeError(
+                f"S3 upload verification failed: key={key} bucket={self.bucket} error={e}"
+            ) from e
+
         storage_path = key  # (필요하면 CDN URL로 교체)
 
         return StoredAsset(
@@ -153,6 +160,15 @@ class S3UploadStorage:
         key = f"{prefix_key}/{stored_name}"
 
         self.client.put_object(Bucket=self.bucket, Key=key, Body=data, ContentType=mime)
+
+        # Verify upload actually persisted — put_object is synchronous but we
+        # guard against silent failures (transient S3 issues, incorrect credentials, etc.)
+        try:
+            self.client.head_object(Bucket=self.bucket, Key=key)
+        except Exception as e:
+            raise RuntimeError(
+                f"S3 upload verification failed: key={key} bucket={self.bucket} error={e}"
+            ) from e
 
         storage_path = key
 

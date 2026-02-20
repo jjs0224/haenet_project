@@ -86,6 +86,20 @@ def resolve_asset_url(storage_path: str, *, expires_in: int = 3600) -> str:
         return storage_path
 
     client = _get_s3_client()
+
+    # Guard: verify the object actually exists before generating a presigned URL.
+    # A presigned URL for a non-existent key will return 404 to the browser,
+    # which is hard to diagnose. Surfacing it here makes the problem visible early.
+    try:
+        client.head_object(Bucket=config.S3_BUCKET, Key=storage_path)
+    except Exception as e:
+        error_code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
+        if error_code in ("404", "NoSuchKey"):
+            print(f"[S3DBG] MISSING OBJECT — key does not exist in S3: {storage_path}")
+        else:
+            print(f"[S3DBG] head_object error ({error_code}): {storage_path} -> {e}")
+        return ""
+
     url = client.generate_presigned_url(
         ClientMethod="get_object",
         Params={"Bucket": config.S3_BUCKET, "Key": storage_path},
