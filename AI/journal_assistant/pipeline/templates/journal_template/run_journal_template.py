@@ -189,7 +189,7 @@ def run_journal_template(payload: Dict[str, Any]) -> bytes:
     )
     paragraph = generate_text(p2)
     if not paragraph:
-        paragraph = f"{nickname} accidentally discovered a mukbang monster powered by today’s meals."
+        paragraph = f"{nickname} accidentally discovered a mukbang powered by today’s meals."
 
     # Image: character with blank bottom area
     img_prompt = build_character_image_prompt(character_spec)

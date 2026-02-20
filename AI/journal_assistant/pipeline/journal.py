@@ -100,7 +100,7 @@ VISUAL STYLE:
 - Looks like a printed journal page
 
 TOP HEADER:
-- Masthead: “Journal of SafeEat”
+- Masthead: “Journal of Food Ray”
 - Metadata: “Korea Field Edition • Mukbang Culture Report”
 - Classic newspaper divider lines
 

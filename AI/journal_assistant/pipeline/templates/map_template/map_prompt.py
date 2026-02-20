@@ -115,7 +115,7 @@ LOCKED AREA (MAP AREA):
 
 
 ALLOWED AREA (OUTSIDE MAP ONLY):
-- Add a big title centered at top: "KFOOD roadmap with SafeEat"
+- Add a big title centered at top: "K-FOOD roadmap with Food Ray"
 - big title must be handwritten-style Korean text
 - Subtitle: "By {nickname} from {country}"
 - Add scrapbook accents around the outer background only (tape, stamps, doodles)

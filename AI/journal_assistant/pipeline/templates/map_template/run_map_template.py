@@ -10,7 +10,7 @@ from AI.journal_assistant.pipeline.templates.map_template.pin_overlay import ren
 from AI.journal_assistant.pipeline.templates.map_template.map_prompt import build_map_poster_prompt_with_ref
 
 ASSETS_DIR = Path(__file__).parent / "assets"
-BASE_MAP = ASSETS_DIR / "map1.png"
+BASE_MAP = ASSETS_DIR / "map_resize.png"
 CALIB = ASSETS_DIR / "kakao_map_calibration.json"
 PIN_ICON = ASSETS_DIR / "pin.png"
 
