@@ -53,6 +53,10 @@ export default function MenuAIResultView({
 
   const imageUrl =
     result?.result_image_url ||
+    result?.rectified_image_url ||
+    result?.artifacts?.rectified_image?.presigned_url ||
+    normalized?.payload?.rectified_image_url ||
+    normalized?.payload?.artifacts?.rectified_image?.presigned_url ||
     normalized?.imageDataUrl;
 
   const resolvedImageSrc = !imgBroken

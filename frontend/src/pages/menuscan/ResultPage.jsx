@@ -119,7 +119,13 @@ function ResultContent({ result }) {
   const normalized = useMemo(() => normalizeBackendPayload(result), [result]);
   const items = result?.items || normalized?.final?.items || [];
 
-  const imageUrl = result?.result_image_url || normalized?.imageDataUrl;
+  const imageUrl =
+    result?.result_image_url ||
+    result?.rectified_image_url ||
+    result?.artifacts?.rectified_image?.presigned_url ||
+    normalized?.payload?.rectified_image_url ||
+    normalized?.payload?.artifacts?.rectified_image?.presigned_url ||
+    normalized?.imageDataUrl;
   const resolvedImageSrc = !imgBroken ? imageUrl : (normalized?.imageDataUrl || imageUrl);
 
   // const jsonText = (() => {
