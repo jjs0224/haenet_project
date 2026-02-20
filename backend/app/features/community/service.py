@@ -108,10 +108,19 @@ def create_pending_community(db: Session, total_data: Dict[str, Any]) -> Dict[st
         )
         db.add(community)
         db.flush()
-    elif community_type and community.community_type != community_type:
-        community.community_type = community_type
-        db.add(community)
-        db.flush()
+    else:
+        # 기존 map 커뮤니티 재사용 — type · active 상태 보정
+        needs_update = False
+        if community_type and community.community_type != community_type:
+            community.community_type = community_type
+            needs_update = True
+        if not community.community_active:
+            # 이전에 비활성화된 경우에도 새 생성 요청이면 활성화
+            community.community_active = True
+            needs_update = True
+        if needs_update:
+            db.add(community)
+            db.flush()
 
     return {
         "community_id": int(community.community_id),
