@@ -90,55 +90,49 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         journal_type = str(payload.get("journal_type") or payload.get("template_type") or "journal").strip().lower()
         return {"image_base64": encoded, "journal_type": journal_type}
 
-    # ✅ (B안) 커뮤니티 생성: AI + 업로드만
+    # (B) community generation: AI + DB
     if task == "journal_generate_community":
         ai_payload = payload.get("ai_payload") or {}
         total_data = payload.get("total_data") or {}
         template_id = int(payload.get("template_id") or (total_data.get("template_id") or 0))
-        community_id = int(payload.get("community_id") or 0)
+        review_ids = payload.get("review_ids") or []
+        review_ids = [int(x) for x in (review_ids or []) if str(x).strip().isdigit()]
+        community_id = int(payload.get("community_id") or total_data.get("community_id") or 0)
+        member_id = int(payload.get("member_id") or total_data.get("member_id") or 0)
 
         if community_id <= 0:
             raise ValueError("community_id is required for async community generation")
+        if member_id <= 0:
+            raise ValueError("member_id is required for async community generation")
 
         from AI.journal_assistant.pipeline.orchestrator import run_orchestrator
         image_bytes: bytes = run_orchestrator(ai_payload)
         if not image_bytes:
             raise ValueError("AI returned empty image bytes")
 
-        # ✅ DB 접근 제거 / 스토리지 업로드만 수행
-        from backend.app.common.service.file_upload_service import save_permanent_bytes, delete_prefix, build_perm_prefix
+        from backend.app.core.database import SessionLocal
+        from backend.app.features.community.service import persist_step2_from_image_bytes
+        from backend.app.features.review.service import availavble_review
 
+        total_data = dict(total_data)
+        total_data["member_id"] = member_id
+        total_data["template_id"] = template_id
+        total_data["community_id"] = community_id
+
+        db = SessionLocal()
         try:
-            perm_prefix = build_perm_prefix(owner_type="community", owner_id=community_id)
-            delete_prefix(prefix_key=perm_prefix)
+            result = _run_async(persist_step2_from_image_bytes(db, total_data, image_bytes))
+            if template_id == 1:
+                ok = availavble_review(db, review_ids)
+                if not ok:
+                    raise RuntimeError("Failed to update review availability")
+            db.commit()
+            return result
         except Exception:
-            pass
-
-        stored = _run_async(
-            save_permanent_bytes(
-                owner_type="community",
-                owner_id=community_id,
-                member_id=int(total_data.get("member_id") or payload.get("member_id") or 0),
-                data=image_bytes,
-                origin_name="community.png",
-                mime_type="image/png",
-                sort_order=0,
-            )
-        )
-
-        return {
-            "community_id": community_id,
-            "template_id": template_id,
-            "stored": {
-                "storage_path": getattr(stored, "storage_path", None),
-                "stored_file_name": getattr(stored, "stored_file_name", None),
-                "org_file_name": getattr(stored, "org_file_name", None),
-                "mime_type": getattr(stored, "mime_type", None),
-                "size_bytes": getattr(stored, "size_bytes", None),
-                "sort_order": getattr(stored, "sort_order", 0),
-                "file_key": getattr(stored, "file_key", None),
-            },
-        }
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     raise ValueError(f"Unsupported task: {task}")
 
@@ -209,7 +203,10 @@ def main() -> None:
 
             try:
                 result = _handle_task(task, payload)
-                _set_job(r, job_id, "DONE", finished_at=_utc_now_iso(), result=result)
+                done_fields = {"finished_at": _utc_now_iso(), "result": result}
+                if task == "journal_generate_community":
+                    done_fields["finalized"] = "1"
+                _set_job(r, job_id, "DONE", **done_fields)
                 _log(f"[worker:{worker_id}] DONE job_id={job_id}")
             except Exception as e:
                 import traceback

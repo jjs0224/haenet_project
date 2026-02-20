@@ -80,26 +80,16 @@ def create_step1(db: Session, payload, member_id: int) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------
-# ✅ 공용: image_bytes로 community 저장 (worker/동기 생성 공용)
+# pending community (async worker)
 # ---------------------------------------------------------------------
-async def persist_step2_from_image_bytes(db: Session, total_data: Dict[str, Any], image_bytes: bytes) -> Dict[str, Any]:
-    """
-    AI 워커(journal_generate_community)가 호출하는 공용 함수.
-    - image_bytes를 S3/로컬에 저장
-    - ImgFile row 생성
-    - community row 생성/재사용(map)
-    """
-    if not image_bytes:
-        raise ValueError("empty image_bytes")
-
+def create_pending_community(db: Session, total_data: Dict[str, Any]) -> Dict[str, Any]:
     member_id = int(total_data.get("member_id") or 0)
     if not member_id:
-        raise ValueError("member_id is required in total_data")
+        raise HTTPException(status_code=422, detail="member_id is required")
 
     template_id = int(total_data.get("template_id") or 0)
     community_type = "journal" if template_id == 1 else ("map" if template_id == 2 else None)
 
-    # 1) community 생성 or 재사용 (map이면 최신 map 1개 유지)
     community: Community | None = None
     if community_type == "map":
         community = db.execute(
@@ -118,10 +108,70 @@ async def persist_step2_from_image_bytes(db: Session, total_data: Dict[str, Any]
         )
         db.add(community)
         db.flush()
+    elif community_type and community.community_type != community_type:
+        community.community_type = community_type
+        db.add(community)
+        db.flush()
+
+    return {
+        "community_id": int(community.community_id),
+        "community_type": community.community_type,
+    }
+
+
+# ---------------------------------------------------------------------
+# common persist from image bytes (worker / sync)
+# ---------------------------------------------------------------------
+async def persist_step2_from_image_bytes(db: Session, total_data: Dict[str, Any], image_bytes: bytes) -> Dict[str, Any]:
+    """
+    Common helper for community creation from image bytes.
+    - upload image bytes to storage
+    - insert ImgFile row
+    - create or reuse community row
+    """
+    if not image_bytes:
+        raise ValueError("empty image_bytes")
+
+    member_id = int(total_data.get("member_id") or 0)
+    if not member_id:
+        raise ValueError("member_id is required in total_data")
+
+    template_id = int(total_data.get("template_id") or 0)
+    community_type = "journal" if template_id == 1 else ("map" if template_id == 2 else None)
+
+    community_id = int(total_data.get("community_id") or 0)
+    community: Community | None = None
+    if community_id:
+        community = db.get(Community, community_id)
+        if community is None:
+            raise ValueError(f"community not found: {community_id}")
+        if int(community.member_id) != member_id:
+            raise ValueError("community member mismatch")
+    elif community_type == "map":
+        community = db.execute(
+            select(Community)
+            .where(Community.member_id == member_id)
+            .where(Community.community_type == "map")
+            .order_by(Community.community_id.desc())
+        ).scalar_one_or_none()
+
+    if community is None:
+        community = Community(
+            member_id=member_id,
+            community_active=True,
+            recommend=0,
+            community_type=community_type,
+        )
+        db.add(community)
+        db.flush()
+    elif community_type and community.community_type != community_type:
+        community.community_type = community_type
+        db.add(community)
+        db.flush()
 
     community_id = int(community.community_id)
 
-    # 2) map이면 기존 파일/DB row 정리 (1개만 유지)
+    # map: delete existing objects (best-effort)
     if community_type == "map":
         try:
             perm_prefix = build_perm_prefix(owner_type="community", owner_id=community_id)
@@ -129,14 +179,14 @@ async def persist_step2_from_image_bytes(db: Session, total_data: Dict[str, Any]
         except Exception:
             pass
 
-        db.execute(
-            delete(ImgFile)
-            .where(ImgFile.owner_type == "community")
-            .where(ImgFile.community_id == community_id)
-        )
-        db.flush()
+    # delete existing ImgFile row (unique constraint)
+    db.execute(
+        delete(ImgFile)
+        .where(ImgFile.owner_type == "community")
+        .where(ImgFile.community_id == community_id)
+    )
+    db.flush()
 
-    # 3) 새 파일 저장 (S3/로컬)
     stored = await save_permanent_bytes(
         owner_type="community",
         owner_id=community_id,
@@ -147,7 +197,6 @@ async def persist_step2_from_image_bytes(db: Session, total_data: Dict[str, Any]
         sort_order=0,
     )
 
-    # 4) ImgFile row insert
     img = ImgFile(
         origin_name=stored.org_file_name,
         storage_key=stored.stored_file_name,
@@ -172,6 +221,76 @@ async def persist_step2_from_image_bytes(db: Session, total_data: Dict[str, Any]
         "community_type": community.community_type,
     }
 
+
+# ---------------------------------------------------------------------
+# finalize job result (when worker only uploaded to storage)
+# ---------------------------------------------------------------------
+def finalize_from_worker_result(
+    db: Session,
+    *,
+    total_data: Dict[str, Any],
+    community_id: int,
+    stored: Dict[str, Any],
+    template_id: int,
+    review_ids: List[int],
+) -> Dict[str, Any]:
+    if not community_id:
+        raise HTTPException(status_code=422, detail="community_id is required")
+
+    community = db.get(Community, int(community_id))
+    if community is None:
+        raise HTTPException(status_code=404, detail="community not found")
+
+    member_id = int(total_data.get("member_id") or community.member_id or 0)
+    if not member_id:
+        raise HTTPException(status_code=422, detail="member_id is required")
+
+    community_type = "journal" if int(template_id) == 1 else ("map" if int(template_id) == 2 else None)
+    if community_type and community.community_type != community_type:
+        community.community_type = community_type
+        db.add(community)
+        db.flush()
+
+    storage_path = stored.get("storage_path")
+    if not storage_path:
+        raise HTTPException(status_code=422, detail="stored.storage_path is required")
+
+    db.execute(
+        delete(ImgFile)
+        .where(ImgFile.owner_type == "community")
+        .where(ImgFile.community_id == int(community_id))
+    )
+    db.flush()
+
+    img = ImgFile(
+        origin_name=stored.get("org_file_name") or "community.png",
+        storage_key=stored.get("stored_file_name") or stored.get("file_key") or storage_path,
+        storage_path=storage_path,
+        mime_type=stored.get("mime_type") or "image/png",
+        file_size=stored.get("size_bytes"),
+        sort_order=int(stored.get("sort_order") or 0),
+        owner_type="community",
+        member_id=member_id,
+        community_id=int(community_id),
+        review_id=None,
+    )
+    db.add(img)
+    db.flush()
+
+    if int(template_id) == 1 and review_ids:
+        from backend.app.features.review.service import availavble_review
+
+        ok = availavble_review(db, review_ids)
+        if not ok:
+            raise HTTPException(status_code=500, detail="Failed to update review availability")
+
+    return {
+        "community_id": int(community_id),
+        "image_urls": resolve_asset_urls([storage_path]),
+        "template_id": int(template_id),
+        "reviews": total_data.get("reviews", []),
+        "community_type": community.community_type,
+    }
 
 # ---------------------------------------------------------------------
 # 등록 Step2 (기존 동기 생성 경로도 공용함수 사용하도록 정리)
