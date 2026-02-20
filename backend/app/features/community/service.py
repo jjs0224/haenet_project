@@ -348,6 +348,225 @@ async def create_step2(db: Session, total_data: Dict[str, Any]) -> Dict[str, Any
 
 # (이하 list/get 등 나머지 코드는 기존 그대로)
 
+# # ---------------------------------------------------------------------
+# # 전체 조회 / 본인 조회 공용
+# # ---------------------------------------------------------------------
+def list_community(
+    db: Session,
+    *,
+    member_id: Optional[int] = None,
+    active_only: Optional[bool] = True,
+) -> List[Dict[str, Any]]:
+    PostAuthor = aliased(Member)
+
+    latest_comment_text_sq = (
+        select(Comment.content)
+        .where(Comment.community_id == Community.community_id)
+        .order_by(Comment.comment_id.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
+
+    latest_comment_nickname_sq = (
+        select(Member.nickname)
+        .join(Comment, Comment.member_id == Member.member_id)
+        .where(Comment.community_id == Community.community_id)
+        .order_by(Comment.comment_id.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
+
+    stmt = (
+        select(
+            Community,
+            PostAuthor.nickname.label("post_nickname"),
+            latest_comment_text_sq.label("latest_comment_text"),
+            latest_comment_nickname_sq.label("latest_comment_nickname"),
+        )
+        .join(PostAuthor, PostAuthor.member_id == Community.member_id)
+    )
+
+    if member_id is not None:
+        stmt = stmt.where(Community.member_id == member_id)
+
+    if active_only is True:
+        stmt = stmt.where(Community.community_active.is_(True))
+    elif active_only is False:
+        stmt = stmt.where(Community.community_active.is_(False))
+
+    rows = db.execute(stmt.order_by(Community.community_id.desc())).all()
+    if not rows:
+        return []
+
+    communities = [row[0] for row in rows]
+    community_ids = [c.community_id for c in communities]
+
+    imgs = db.execute(
+        select(ImgFile)
+        .where(ImgFile.owner_type == "community")
+        .where(ImgFile.community_id.in_(community_ids))
+        .order_by(ImgFile.community_id.asc(), ImgFile.sort_order.asc())
+    ).scalars().all()
+
+    img_map: Dict[int, List[str]] = {}
+    for img in imgs:
+        img_map.setdefault(img.community_id, []).append(img.storage_path)
+
+    out: List[Dict[str, Any]] = []
+    for c, post_nickname, latest_comment_text, latest_comment_nickname in rows:
+        out.append({
+            "community_id": c.community_id,
+            "member_id": c.member_id,
+            "nickname": post_nickname,
+            "community_active": bool(c.community_active),
+            "recommend": int(c.recommend or 0),
+            "created_at": c.create_at.isoformat() if getattr(c, "create_at", None) else None,
+            "updated_at": c.update_at.isoformat() if getattr(c, "update_at", None) else None,
+            "image_urls": resolve_asset_urls(img_map.get(c.community_id, [])),
+            "latest_comment_text": latest_comment_text,
+            "latest_comment_nickname": latest_comment_nickname,
+            "community_type": c.community_type,
+        })
+    return out
+
+
+# ---------------------------------------------------------------------
+# 상세
+# ---------------------------------------------------------------------
+def get_community_detail(db: Session, community_id: int, *, member_id: Optional[int] = None) -> Dict[str, Any]:
+    latest_comment_text_sq = (
+        select(Comment.content)
+        .where(Comment.community_id == Community.community_id)
+        .order_by(Comment.comment_id.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
+
+    row = db.execute(
+        select(Community, Member.nickname, latest_comment_text_sq)
+        .join(Member, Member.member_id == Community.member_id)
+        .where(Community.community_id == int(community_id))
+    ).first()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="community not found")
+
+    c, nickname, latest_comment_text = row
+
+    img_rows = db.execute(
+        select(ImgFile)
+        .where(ImgFile.owner_type == "community")
+        .where(ImgFile.community_id == int(community_id))
+        .order_by(ImgFile.sort_order.asc())
+    ).scalars().all()
+
+    image_urls = resolve_asset_urls([img.storage_path for img in img_rows])
+
+    return {
+        "community_id": c.community_id,
+        "member_id": c.member_id,
+        "nickname": nickname,
+        "community_active": bool(c.community_active),
+        "recommend": int(c.recommend or 0),
+        "liked": False,
+        "created_at": c.create_at.isoformat() if getattr(c, "create_at", None) else None,
+        "updated_at": c.update_at.isoformat() if getattr(c, "update_at", None) else None,
+        "image_urls": image_urls,
+        "latest_comment_text": latest_comment_text,
+    }
+
+"""
+community / recommend 실제 좋아요 수
+
+community_recommend community_id 당 1개의 좋아요 1 row
+커뮤니티 1개의 글에 좋아요 5개 발생 시
+row 5개 생성
+
+최종 recommend == row의 수
+"""
+# community recommend 로직
+def toggle_recommend(db: Session, *, community_id: int, member_id: int) -> Dict[str, Any]:
+    c = db.get(Community, int(community_id))
+    if not c:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    exists = db.execute(
+        select(CommunityRecommend.recommend_id).where(
+            CommunityRecommend.community_id == int(community_id),
+            CommunityRecommend.member_id == int(member_id),
+        )
+    ).scalar_one_or_none()
+
+    # update_at 보존: 좋아요는 정렬 기준에 영향주지 않도록
+    original_update_at = c.update_at
+
+    if exists is None:
+        # 좋아요 추가(1 row 생성)
+        db.add(CommunityRecommend(community_id=int(community_id), member_id=int(member_id)))
+        db.flush()
+
+        # 카운트 +1 (update_at 원래 값 유지)
+        db.execute(
+            update(Community)
+            .where(Community.community_id == int(community_id))
+            .values(recommend=Community.recommend + 1, update_at=original_update_at)
+        )
+        db.flush()
+        db.refresh(c)
+
+        return {"recommended": True, "recommend": int(c.recommend or 0)}
+    else:
+        # 좋아요 취소(row 삭제)
+        db.execute(
+            delete(CommunityRecommend).where(
+                CommunityRecommend.community_id == int(community_id),
+                CommunityRecommend.member_id == int(member_id),
+            )
+        )
+
+        # 카운트 -1 (0 아래 방지, update_at 원래 값 유지)
+        db.execute(
+            update(Community)
+            .where(Community.community_id == int(community_id), Community.recommend > 0)
+            .values(recommend=Community.recommend - 1, update_at=original_update_at)
+        )
+        db.flush()
+        db.refresh(c)
+
+        return {"recommended": False, "recommend": int(c.recommend or 0)}
+
+
+# ---------------------------------------------------------------------
+# 공개 설정 토글 (community_active)
+# ---------------------------------------------------------------------
+def toggle_active(db: Session, *, community_id: int, member_id: int) -> Dict[str, Any]:
+    c = db.get(Community, int(community_id))
+    if not c:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    if c.member_id != int(member_id):
+        raise HTTPException(status_code=403, detail="본인 게시글만 변경할 수 있습니다")
+
+    # update_at 보존: 공개 토글은 정렬 기준에 영향주지 않도록
+    original_update_at = c.update_at
+
+    new_active = not c.community_active
+    db.execute(
+        update(Community)
+        .where(Community.community_id == int(community_id))
+        .values(community_active=new_active, update_at=original_update_at)
+    )
+    db.flush()
+    db.refresh(c)
+
+    return {"community_id": c.community_id, "community_active": bool(c.community_active)}
+
+
+
+
+
+
+
 # from sqlalchemy.orm import Session, aliased
 # from sqlalchemy import select, delete, update, func, true
 # from fastapi import HTTPException
