@@ -453,3 +453,89 @@ def get_community_detail(db: Session, community_id: int, *, member_id: Optional[
         "image_urls": image_urls,
         "latest_comment_text": latest_comment_text,
     }
+
+"""
+community / recommend 실제 좋아요 수
+
+community_recommend community_id 당 1개의 좋아요 1 row
+커뮤니티 1개의 글에 좋아요 5개 발생 시 
+row 5개 생성
+
+최종 recommend == row의 수
+"""
+# community recommend 로직
+def toggle_recommend(db: Session, *, community_id: int, member_id: int) -> Dict[str, Any]:
+    c = db.get(Community, int(community_id))
+    if not c:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    exists = db.execute(
+        select(CommunityRecommend.recommend_id).where(
+            CommunityRecommend.community_id == int(community_id),
+            CommunityRecommend.member_id == int(member_id),
+        )
+    ).scalar_one_or_none()
+
+    # update_at 보존: 좋아요는 정렬 기준에 영향주지 않도록
+    original_update_at = c.update_at
+
+    if exists is None:
+        # 좋아요 추가(1 row 생성)
+        db.add(CommunityRecommend(community_id=int(community_id), member_id=int(member_id)))
+        db.flush()
+
+        # 카운트 +1 (update_at 원래 값 유지)
+        db.execute(
+            update(Community)
+            .where(Community.community_id == int(community_id))
+            .values(recommend=Community.recommend + 1, update_at=original_update_at)
+        )
+        db.flush()
+        db.refresh(c)
+
+        return {"recommended": True, "recommend": int(c.recommend or 0)}
+    else:
+        # 좋아요 취소(row 삭제)
+        db.execute(
+            delete(CommunityRecommend).where(
+                CommunityRecommend.community_id == int(community_id),
+                CommunityRecommend.member_id == int(member_id),
+            )
+        )
+
+        # 카운트 -1 (0 아래 방지, update_at 원래 값 유지)
+        db.execute(
+            update(Community)
+            .where(Community.community_id == int(community_id), Community.recommend > 0)
+            .values(recommend=Community.recommend - 1, update_at=original_update_at)
+        )
+        db.flush()
+        db.refresh(c)
+
+        return {"recommended": False, "recommend": int(c.recommend or 0)}
+
+
+# ---------------------------------------------------------------------
+# 공개 설정 토글 (community_active)
+# ---------------------------------------------------------------------
+def toggle_active(db: Session, *, community_id: int, member_id: int) -> Dict[str, Any]:
+    c = db.get(Community, int(community_id))
+    if not c:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    if c.member_id != int(member_id):
+        raise HTTPException(status_code=403, detail="본인 게시글만 변경할 수 있습니다")
+
+    # update_at 보존: 공개 토글은 정렬 기준에 영향주지 않도록
+    original_update_at = c.update_at
+
+    new_active = not c.community_active
+    db.execute(
+        update(Community)
+        .where(Community.community_id == int(community_id))
+        .values(community_active=new_active, update_at=original_update_at)
+    )
+    db.flush()
+    db.refresh(c)
+
+    return {"community_id": c.community_id, "community_active": bool(c.community_active)}
