@@ -101,10 +101,28 @@ def rectify_image(image_bgr: np.ndarray, cfg: RectifyConfig) -> RectifyResult:
 
 #run time 에서 사용되는함수 정의 이미지 읽고 쓰는부분정의
 def read_image_bgr(path: str) -> np.ndarray:
-    img = cv2.imread(path, cv2.IMREAD_COLOR)
-    if img is None:
-        raise FileNotFoundError(f"Failed to read image: {path}")
-    return img
+    """
+    Read image as BGR with EXIF orientation applied (if available).
+
+    OpenCV ignores EXIF orientation, which causes rotated outputs when users
+    upload photos from mobile devices. We try Pillow first to apply
+    ImageOps.exif_transpose, then fall back to OpenCV.
+    """
+    try:
+        from PIL import Image, ImageOps  # type: ignore
+
+        with Image.open(path) as im:
+            im = ImageOps.exif_transpose(im)
+            im = im.convert("RGB")
+            img_rgb = np.array(im)
+            if img_rgb.size == 0:
+                raise ValueError("empty image after EXIF transpose")
+            return img_rgb[:, :, ::-1].copy()
+    except Exception:
+        img = cv2.imread(path, cv2.IMREAD_COLOR)
+        if img is None:
+            raise FileNotFoundError(f"Failed to read image: {path}")
+        return img
 
 
 def write_image_bgr(path: str, image_bgr: np.ndarray) -> None:
