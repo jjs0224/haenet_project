@@ -312,6 +312,8 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         result = _json.loads(result_path.read_text(encoding="utf-8"))
         if isinstance(result, dict):
             resolved_run_id = str(run_id or result.get("run_id") or run_dir.name)
+
+            # --- S3 upload (rectified image) ---
             upload_info = _upload_rectified_image(run_dir, resolved_run_id)
             if upload_info:
                 artifacts = result.get("artifacts")
@@ -321,6 +323,8 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
                 result["artifacts"] = artifacts
                 if upload_info.get("presigned_url"):
                     result["rectified_image_url"] = upload_info["presigned_url"]
+
+            # --- S3 upload (result overlay image) ---
             result_upload = _upload_result_image(run_dir, resolved_run_id, result)
             if result_upload:
                 artifacts = result.get("artifacts")
@@ -330,6 +334,33 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
                 result["artifacts"] = artifacts
                 if result_upload.get("presigned_url"):
                     result["result_image_url"] = result_upload["presigned_url"]
+
+            # --- base64 fallback: S3 업로드 실패 시 rectified 이미지를 base64로 포함 ---
+            if not result.get("rectified_image_url"):
+                rectified_path = run_dir / "rectify" / "rectified.jpg"
+                if rectified_path.exists():
+                    _log("[worker] S3 unavailable; embedding rectified image as base64")
+                    img_b64 = base64.b64encode(rectified_path.read_bytes()).decode("ascii")
+                    result["rectified_image"] = {
+                        "mime": "image/jpeg",
+                        "base64": img_b64,
+                    }
+
+            # --- base64 fallback: S3 업로드 실패 시 result overlay를 base64로 포함 ---
+            if not result.get("result_image_url"):
+                overlay_path = run_dir / "final" / "result.jpg"
+                if not overlay_path.exists():
+                    overlay_path_candidate = _render_result_overlay(run_dir, result)
+                    if overlay_path_candidate:
+                        overlay_path = overlay_path_candidate
+                if overlay_path.exists():
+                    _log("[worker] S3 unavailable; embedding result image as base64")
+                    img_b64 = base64.b64encode(overlay_path.read_bytes()).decode("ascii")
+                    result["result_image"] = {
+                        "mime": "image/jpeg",
+                        "base64": img_b64,
+                    }
+
         return result
 
     raise ValueError(f"Unsupported task: {task}")

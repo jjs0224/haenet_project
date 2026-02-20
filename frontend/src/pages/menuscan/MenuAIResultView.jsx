@@ -16,20 +16,27 @@ function normalizeBackendPayload(raw) {
     payload?.final_json ??
     payload;
 
+  // rectified image base64 fallback
   const rectified = payload?.rectified_image ?? payload?.rectified ?? null;
+  const rectB64 = rectified?.base64 ?? null;
+  const rectMime = rectified?.mime ?? "image/jpeg";
+  const rectifiedDataUrl = rectB64 ? `data:${rectMime};base64,${rectB64}` : null;
 
-  const base64 = rectified?.base64 ?? null;
-  const mime = rectified?.mime ?? "image/jpeg";
+  // result overlay image base64 fallback
+  const resultImg = payload?.result_image ?? null;
+  const resB64 = resultImg?.base64 ?? null;
+  const resMime = resultImg?.mime ?? "image/jpeg";
+  const resultDataUrl = resB64 ? `data:${resMime};base64,${resB64}` : null;
 
-  const imageDataUrl = base64
-    ? `data:${mime};base64,${base64}`
-    : null;
+  // result overlay 우선, 없으면 rectified
+  const imageDataUrl = resultDataUrl || rectifiedDataUrl;
 
   return {
     raw: root,
     payload,
     final: finalObj,
-    imageDataUrl
+    imageDataUrl,
+    rectifiedDataUrl
   };
 }
 
@@ -53,6 +60,9 @@ export default function MenuAIResultView({
 
   const imageUrl =
     result?.result_image_url ||
+    result?.artifacts?.result_image?.presigned_url ||
+    normalized?.payload?.result_image_url ||
+    normalized?.payload?.artifacts?.result_image?.presigned_url ||
     result?.rectified_image_url ||
     result?.artifacts?.rectified_image?.presigned_url ||
     normalized?.payload?.rectified_image_url ||
