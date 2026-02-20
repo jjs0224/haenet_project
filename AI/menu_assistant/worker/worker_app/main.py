@@ -129,6 +129,122 @@ def _upload_rectified_image(run_dir: Path, run_id: str) -> Optional[Dict[str, An
     }
 
 
+def _render_result_overlay(run_dir: Path, result: Any) -> Optional[Path]:
+    rectified_path = run_dir / "rectify" / "rectified.jpg"
+    if not rectified_path.exists():
+        _log(f"[worker] rectified image not found for overlay: {rectified_path}")
+        return None
+
+    items = None
+    if isinstance(result, dict):
+        items = result.get("items")
+    elif isinstance(result, list):
+        items = result
+
+    if not isinstance(items, list) or not items:
+        _log("[worker] overlay skipped: no items with poly")
+        return None
+
+    try:
+        import cv2  # type: ignore
+        import numpy as np  # type: ignore
+    except Exception as e:
+        _log(f"[worker] overlay skipped: missing cv2/numpy: {type(e).__name__}: {e}")
+        return None
+
+    img = cv2.imread(str(rectified_path), cv2.IMREAD_COLOR)
+    if img is None:
+        _log(f"[worker] overlay skipped: failed to read {rectified_path}")
+        return None
+
+    def _label_from_item(it: Dict[str, Any]) -> str:
+        for key in ("menu_name_ko", "menu_name_en", "menu_name"):
+            val = it.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+        return ""
+
+    used = 0
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        poly = item.get("poly")
+        if not isinstance(poly, list) or len(poly) < 4:
+            continue
+        try:
+            pts = np.array(poly, dtype=np.int32).reshape((-1, 1, 2))
+        except Exception:
+            continue
+        if pts.size == 0:
+            continue
+
+        cv2.polylines(img, [pts], True, (0, 255, 0), 2)
+        label = _label_from_item(item)
+        if label:
+            x, y = int(pts[0][0][0]), int(pts[0][0][1])
+            y = max(15, y - 6)
+            cv2.putText(img, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1, cv2.LINE_AA)
+        used += 1
+
+    if used == 0:
+        _log("[worker] overlay skipped: no valid polygons")
+        return None
+
+    out_dir = run_dir / "final"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "result.jpg"
+    ok = cv2.imwrite(str(out_path), img)
+    if not ok:
+        _log(f"[worker] overlay write failed: {out_path}")
+        return None
+
+    return out_path
+
+
+def _upload_result_image(run_dir: Path, run_id: str, result: Any) -> Optional[Dict[str, Any]]:
+    bucket = os.getenv("S3_BUCKET") or ""
+    if not bucket:
+        _log("[worker] S3_BUCKET not set; skip result image upload")
+        return None
+
+    overlay_path = _render_result_overlay(run_dir, result)
+    if overlay_path is None:
+        return None
+
+    client = _get_s3_client()
+    if client is None:
+        return None
+
+    prefix = os.getenv("MENU_ASSISTANT_IMAGE_S3_PREFIX") or os.getenv("S3_PREFIX") or "upload"
+    prefix = prefix.strip("/")
+    key = f"{prefix}/menu_assistant/result/{run_id}/result.jpg"
+
+    try:
+        client.upload_file(str(overlay_path), bucket, key, ExtraArgs={"ContentType": "image/jpeg"})
+    except Exception as e:
+        _log(f"[worker] result image upload failed: {type(e).__name__}: {e}")
+        return None
+
+    expires_in = int(os.getenv("MENU_ASSISTANT_IMAGE_URL_TTL", "3600"))
+    presigned_url = ""
+    try:
+        presigned_url = client.generate_presigned_url(
+            ClientMethod="get_object",
+            Params={"Bucket": bucket, "Key": key},
+            ExpiresIn=expires_in,
+        )
+    except Exception as e:
+        _log(f"[worker] presign failed for result image: {type(e).__name__}: {e}")
+
+    return {
+        "bucket": bucket,
+        "key": key,
+        "s3_uri": f"s3://{bucket}/{key}",
+        "presigned_url": presigned_url,
+        "expires_in": expires_in,
+    }
+
+
 def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     실제 AI 처리 로직 연결 지점.
@@ -205,6 +321,15 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
                 result["artifacts"] = artifacts
                 if upload_info.get("presigned_url"):
                     result["rectified_image_url"] = upload_info["presigned_url"]
+            result_upload = _upload_result_image(run_dir, resolved_run_id, result)
+            if result_upload:
+                artifacts = result.get("artifacts")
+                if not isinstance(artifacts, dict):
+                    artifacts = {}
+                artifacts["result_image"] = result_upload
+                result["artifacts"] = artifacts
+                if result_upload.get("presigned_url"):
+                    result["result_image_url"] = result_upload["presigned_url"]
         return result
 
     raise ValueError(f"Unsupported task: {task}")

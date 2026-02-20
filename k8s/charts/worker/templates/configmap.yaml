@@ -6,6 +6,10 @@ metadata:
     {{- include "worker.labels" . | nindent 4 }}
 data:
   APP_ENV: {{ .Values.env.APP_ENV | quote }}
+  DB_HOST: {{ default "" .Values.env.DB_HOST | quote }}
+  DB_PORT: {{ default "3306" .Values.env.DB_PORT | quote }}
+  DB_NAME: {{ default "" .Values.env.DB_NAME | quote }}
+  DB_USER: {{ default "" .Values.env.DB_USER | quote }}
   LOG_LEVEL: {{ .Values.config.LOG_LEVEL | quote }}
   QUEUE_TYPE: {{ .Values.queue.type | quote }}
   REDIS_URL: {{ .Values.queue.redisUrl | quote }}
