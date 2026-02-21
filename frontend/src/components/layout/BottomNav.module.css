@@ -12,9 +12,9 @@
   justify-content: space-around;
   align-items: center;
 
-  height: 64px;
+  height: calc(64px + env(safe-area-inset-bottom));
   padding: 0 16px;
-  padding-bottom: 6px;
+  padding-bottom: calc(6px + env(safe-area-inset-bottom));
   box-sizing: border-box;
 
   background: #FFFFFF;
@@ -44,14 +44,11 @@
   transition: color 0.2s ease;
 }
 
-/* 활성 상태 텍스트 색 */
 .navItem.active span {
   color: #2E7D32;
 }
 
 /* ===== Home 중앙 원형 버튼 (모바일 최적화) ===== */
-
-
 .homeCircle {
   width: 48px;
   height: 48px;
@@ -66,7 +63,6 @@
 
   transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
 
-  /* 바 중앙에서 약간 위로 올림 */
   margin-top: -16px;
 }
 

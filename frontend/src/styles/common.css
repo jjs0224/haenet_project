@@ -13,6 +13,20 @@ html, body {
   font-size: 14px; /* 모바일 기본 폰트 크기 */
 }
 
+/* 일부 기종(특히 Android WebView)에서 1~2px 옆으로 튀는 스크롤 방지 */
+body {
+  overflow-x: clip;
+}
+
+img, video, canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+input, textarea, select, button {
+  max-width: 100%;
+}
+
 body {
   display: flex;
   justify-content: center;
@@ -22,7 +36,9 @@ body {
 #root {
   width: 100%;
   max-width: 430px; /* iPhone 16 Pro Max 너비 */
-  min-height: 100vh;
+  /* 모바일 주소창/하단바 변화 대응 */
+  min-height: 100svh;
+  min-height: 100vh; /* fallback */
   background-color: #ffffff;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
   position: relative;
@@ -50,13 +66,11 @@ body {
 
 /* ===================================================================
    app-main  —  Header 아래 · BottomNav 위의 본문 영역
-   iPhone 16 Pro Max 최적화 (430x932px)
-   Header 높이: 56px
-   BottomNav 높이: 64px
    =================================================================== */
 .app-main {
   padding-top: 7px;          /* Header 아래 간격 */
-  padding-bottom: 76px;       /* BottomNav 위 간격 (64px bar + 여유 12px) */
-  /* min-height: 100vh; */
+  /* BottomNav(64px) + 여유 + iOS 안전영역 */
+  padding-bottom: calc(76px + env(safe-area-inset-bottom));
   box-sizing: border-box;
+  overflow-x: hidden;
 }

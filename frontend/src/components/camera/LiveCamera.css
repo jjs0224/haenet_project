@@ -3,6 +3,8 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
+  /* iOS/Android에서 하단 홈바/주소창 때문에 버튼이 가려지는 문제 방지 */
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .camera-video {
@@ -43,7 +45,8 @@
 
 .capture-button {
   position: absolute;
-  bottom: 30px;
+  /* 안전영역 + 하단바 고려 */
+  bottom: calc(16px + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   width: 100px;
@@ -53,6 +56,7 @@
   color: mediumspringgreen;
   background: rgba(0, 0, 0, 0.5);
   font-size: 14px;
+  z-index: 10;
 }
 
 /* ========================
