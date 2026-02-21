@@ -3,7 +3,8 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  /* iOS/Android에서 하단 홈바/주소창 때문에 버튼이 가려지는 문제 방지 */
+
+  /* ✅ iOS/일부 기종에서 하단 홈바(safe-area) 때문에 버튼이 가려지는 것을 방지 */
   padding-bottom: env(safe-area-inset-bottom);
 }
 
@@ -41,12 +42,20 @@
 
 /* ========================
    Capture Button
+   ✅ 기존 버튼 디자인 유지 + 가려짐만 방지
 ======================== */
 
 .capture-button {
   position: absolute;
-  /* 안전영역 + 하단바 고려 */
-  bottom: calc(16px + env(safe-area-inset-bottom));
+
+  /*
+    ✅ 기존 bottom: 30px 유지하되,
+    safe-area가 더 큰 기기에서는 그만큼 위로 올려서 항상 보이게 처리
+    - max() 지원 브라우저에서 자연스럽게 동작
+    - 지원 안 되는 경우엔 아래 fallback(30px)이 적용됨
+  */
+  bottom: max(30px, calc(16px + env(safe-area-inset-bottom)));
+
   left: 50%;
   transform: translateX(-50%);
   width: 100px;
@@ -56,7 +65,16 @@
   color: mediumspringgreen;
   background: rgba(0, 0, 0, 0.5);
   font-size: 14px;
-  z-index: 10;
+
+  /* ✅ 어떤 레이어 뒤로 가려지는 문제 방지 */
+  z-index: 50;
+}
+
+/* max() 미지원 브라우저 fallback (거의 없지만 안전장치) */
+@supports not (bottom: max(1px, 2px)) {
+  .capture-button {
+    bottom: calc(30px + env(safe-area-inset-bottom));
+  }
 }
 
 /* ========================
