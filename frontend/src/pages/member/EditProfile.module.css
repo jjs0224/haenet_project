@@ -61,6 +61,10 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.restrictedSection {
+  margin-top: 4px;
+}
+
 /* ===== Form Group ===== */
 .formGroup {
   display: flex;
@@ -103,7 +107,7 @@
   box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
 }
 
-/* ===== Section Header ===== */
+/* ===== Section Header (Restricted) ===== */
 .sectionHeader {
   display: flex;
   justify-content: space-between;
@@ -193,36 +197,99 @@
   border: 1px solid #DDDDDD;
 }
 
-/* ===== Dislike Section ===== */
+/* ===============================
+   Dislike Ingredients (이미지처럼)
+   =============================== */
 .dislikeSection {
   margin-top: 16px;
 }
 
-.dislikeSection .sectionHeader {
+/* 상단 타이틀 박스 */
+.registerSectionTitle {
   margin-bottom: 0;
   background-color: #FFFFFF;
   border: 1px solid #DDDDDD;
-  border-bottom: none;              /* 기존 하단 테두리 제거 */
+  border-bottom: none;
   border-radius: 10px 10px 0 0;
-  padding: 12px 14px;
-  position: relative;               /* ::after 기준 */
+  padding: 14px 16px 12px 16px;
+  position: relative;
 }
 
-/* RegisterSectionTitle 과 동일한 하단 라인 */
-.dislikeSection .sectionHeader::after {
+.registerSectionTitle::after {
   content: "";
   position: absolute;
   bottom: 0;
-  left: 14px;                       /* ← 좌우 공백 */
-  right: 14px;                      /* → */
+  left: 16px;
+  right: 16px;
   height: 1px;
   background-color: #7d2e2e;
 }
 
-.dislikeSection .card {
+.registerSectionTitle h3 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #333333;
+}
+
+.sub {
+  font-size: 12px;
+  color: #666666;
+  font-weight: 400;
+}
+
+/* 하단 내용 박스 */
+.dislikesSection {
+  padding: 14px;
+  background-color: #FFFFFF;
+  border: 1px solid #DDDDDD;
   border-top: none;
   border-radius: 0 0 10px 10px;
-  margin-bottom: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 입력 + Add 버튼 한 줄 */
+.inputRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
+.dislikeInput {
+  flex: 1 1 0%;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+}
+
+.dislikeAddButton {
+  flex: 0 0 auto;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid #DDDDDD;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: #333333;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dislikeAddButton:hover:not(:disabled) {
+  background: #F1F8E9;
+  border-color: #81C784;
+}
+
+.dislikeAddButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .dislikeTagsContainer {
@@ -235,54 +302,122 @@
 .dislikeTag {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   padding: 5px 10px;
   background: #E8F5E9;
   color: #2E7D32;
   border-radius: 14px;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 700;
   border: 1px solid #81C784;
 }
 
-/* ===== Dislike Input Row ===== */
-.inputRow {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  width: 100%;
-}
-
-/* 입력창: 무조건 제일 넓게 */
-.dislikeInput {
-  flex: 1 1 0%;
-  min-width: 0;
-  height: 36px;
-  padding: 0 10px;
-  font-size: 13px;
-}
-
-/* Dislike 전용 버튼 (공용 button 절대 쓰지 말 것) */
-.dislikeAddButton {
-  flex: 0 0 auto;
-  height: 36px;
-  padding: 0 10px;
-  font-size: 12px;
-  border-radius: 8px;
-  border: 1px solid #DDDDDD;
-  background: #FFFFFF;
-  color: #333333;
+.dislikeRemoveBtn {
+  border: none;
+  background: transparent;
+  color: #2E7D32;
+  font-weight: 900;
   cursor: pointer;
-  white-space: nowrap;
-}
-
-.dislikeAddButton:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  line-height: 1;
+  padding: 0 2px;
 }
 
 .dislikeCounter {
   font-size: 12px;
   color: #333333;
-  padding: 4px;
+  padding: 6px 2px 2px;
+}
+
+/* ===============================
+   RestrictionsPicker 전역 클래스 스타일
+   (Admin_new.css에만 있던 걸 여기서 :global로 적용)
+   =============================== */
+:global(.restrictions-picker-wrapper) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+:global(.restrictions-picker-empty) {
+  padding: 16px;
+  border: 1px dashed #DDDDDD;
+  border-radius: 8px;
+  background-color: #FAFAFA;
+  color: #666666;
+  text-align: center;
+  font-size: 12px;
+}
+
+:global(.restrictions-category-card) {
+  padding: 12px;
+  background-color: #FFFFFF;
+  border: 1px solid #DDDDDD;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+:global(.restrictions-category-card:hover) {
+  background-color: #F1F8E9;
+  border-color: #81C784;
+}
+
+:global(.restrictions-category-title) {
+  font-weight: 700;
+  font-size: 13px;
+  color: #333333;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #7d2e2e;
+}
+
+:global(.restrictions-items-container) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+:global(.restriction-item-badge) {
+  padding: 6px 12px;
+  border: 1px solid #dc3545;
+  border-radius: 16px;
+  background: #fff3cd;
+  font-weight: 600;
+  font-size: 11px;
+  color: #dc3545;
+  transition: all 0.2s ease;
+}
+
+:global(.restriction-item-label) {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid #DDDDDD;
+  border-radius: 16px;
+  padding: 6px 12px;
+  cursor: pointer;
+  user-select: none;
+  background-color: #FFFFFF;
+  font-size: 11px;
+  color: #666666;
+  transition: all 0.2s ease;
+}
+
+:global(.restriction-item-label:hover) {
+  background-color: #F1F8E9;
+  border-color: #81C784;
+}
+
+:global(.restriction-item-label input[type="checkbox"]) {
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: #d34242;
+}
+
+:global(.restriction-item-label.checked) {
+  background: #ffcdcd;
+  border-color: #dc3545;
+  font-weight: 700;
+  color: #dc3545;
 }
