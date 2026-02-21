@@ -1,65 +1,73 @@
-/* ===== Global Reset & Base Styles (iPhone 16 Pro Max Optimized) ===== */
+/* ===== Global Reset & Base Styles ===== */
 * {
   box-sizing: border-box;
 }
 
-html, body {
+/* ✅ 모바일 기종별 1~2px 가로 터짐 방지 (핵심) */
+html,
+body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
   width: 100%;
   min-height: 100%;
-  overflow-x: hidden;
-  font-size: 14px; /* 모바일 기본 폰트 크기 */
-}
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+  font-size: 14px;
 
-/* 일부 기종(특히 Android WebView)에서 1~2px 옆으로 튀는 스크롤 방지 */
-body {
+  /* 기존 hidden만으로는 WebView에서 가끔 뚫림 → clip 병행 */
+  overflow-x: hidden;
   overflow-x: clip;
 }
 
-img, video, canvas {
-  max-width: 100%;
-  height: auto;
-}
-
-input, textarea, select, button {
-  max-width: 100%;
-}
-
+/* body 레이아웃(기존 유지) */
 body {
   display: flex;
   justify-content: center;
   background-color: #f0f0f0;
 }
 
+/* ✅ 루트 자체도 가로 오버플로우 클립 */
 #root {
   width: 100%;
-  max-width: 430px; /* iPhone 16 Pro Max 너비 */
-  /* 모바일 주소창/하단바 변화 대응 */
-  min-height: 100svh;
-  min-height: 100vh; /* fallback */
+  max-width: 430px;
+  min-height: 100svh; /* iOS 주소창 변화 안정 */
+  min-height: 100vh;  /* fallback */
   background-color: #ffffff;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
   position: relative;
+
+  overflow-x: clip;
+}
+
+/* ✅ 이미지/비디오/캔버스가 부모 폭을 넘지 않게 */
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ✅ 입력/버튼이 가로 터짐 유발하는 경우가 많아서 방지 */
+input,
+textarea,
+select,
+button {
+  max-width: 100%;
 }
 
 /* ===== Scrollbar Styling (모바일 최적화) ===== */
 ::-webkit-scrollbar {
-  width: 6px; /* 모바일에서 더 얇게 */
+  width: 6px;
   height: 6px;
 }
-
 ::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 3px;
 }
-
 ::-webkit-scrollbar-thumb {
   background: rgba(102, 126, 234, 0.5);
   border-radius: 3px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(102, 126, 234, 0.7);
 }
@@ -68,9 +76,16 @@ body {
    app-main  —  Header 아래 · BottomNav 위의 본문 영역
    =================================================================== */
 .app-main {
-  padding-top: 7px;          /* Header 아래 간격 */
-  /* BottomNav(64px) + 여유 + iOS 안전영역 */
-  padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  padding-top: 7px;
+  padding-bottom: calc(76px + env(safe-area-inset-bottom)); /* ✅ iOS 하단 안전영역 포함 */
   box-sizing: border-box;
-  overflow-x: hidden;
+
+  /* ✅ 내부 요소가 살짝 밀어도 가로 스크롤 안 생기게 */
+  overflow-x: clip;
+  width: 100%;
+}
+
+/* ✅ flex/grid 자식이 내용 때문에 폭을 밀어내는 케이스 방지 */
+.app-main * {
+  min-width: 0;
 }

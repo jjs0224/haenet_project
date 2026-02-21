@@ -1,10 +1,13 @@
 /* ===== Profile Sidebar ===== */
 .sidebar {
-  background-color: #FFFFFF; /* 흰색 배경 */
+  background-color: #FFFFFF;
   border: 1px solid #DDDDDD;
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+  /* ✅ 혹시 내부가 밀어도 사이드바가 가로로 안 튀게 */
+  overflow-x: clip;
 }
 
 .loading {
@@ -14,7 +17,7 @@
   padding: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   text-align: center;
-  color: #333333; /* 다크 그레이 */
+  color: #333333;
   font-size: 12px;
 }
 
@@ -28,7 +31,7 @@
   width: 70px;
   height: 70px;
   border-radius: 50%;
-  background: #2E7D32; /* 딥 그린 */
+  background: #2E7D32;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -43,13 +46,18 @@
   margin: 0 0 6px 0;
   font-size: 18px;
   font-weight: 700;
-  color: #333333; /* 다크 그레이 */
+  color: #333333;
 }
 
 .email {
   margin: 0;
-  color: #666666; /* 미디엄 그레이 */
+  color: #666666;
   font-size: 12px;
+
+  /* ✅ 이메일이 길면 가로 터짐 유발 → 안전 처리 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ===== Info Section ===== */
@@ -62,7 +70,6 @@
 .infoItem {
   margin-bottom: 8px;
 }
-
 .infoItem:last-child {
   margin-bottom: 0;
 }
@@ -94,7 +101,7 @@
 .editButton {
   display: block;
   padding: 10px;
-  background: #2E7D32; /* 딥 그린 */
+  background: #2E7D32;
   color: white;
   text-decoration: none;
   border-radius: 8px;
@@ -106,40 +113,27 @@
 }
 
 .editButton:hover {
-  background: #1B5E20; /* 더 진한 그린 */
+  background: #1B5E20;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(46, 125, 50, 0.4);
-}
-
-.deleteButton {
-  padding: 10px;
-  background: #FFFFFF;
-  color: #D32F2F; /* 레드 - 위험 */
-  border: 1px solid #D32F2F;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.deleteButton:hover {
-  background: #D32F2F; /* 레드 배경 */
-  color: white;
-  transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(211, 47, 47, 0.3);
 }
 
 /* ===== Dislikes Section ===== */
 .dislikesList {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   margin-top: 6px;
+
+  /* ✅ wrap이 확실히 동작하도록 */
+  max-width: 100%;
+  min-width: 0;
 }
 
 .dislikeTag {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+
   padding: 3px 8px;
   background: #f5e8e8;
   color: #c00;
@@ -147,17 +141,29 @@
   font-size: 10px;
   font-weight: 500;
   border: 1px solid #ffb4b4;
+
+  /* ✅ 한 개 태그가 폭을 넘겨서 가로 터짐 방지 */
+  max-width: 100%;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
-/* ===== Restriction Items Section (similar to ReviewCard) ===== */
+/* ===== Restriction Items Section ===== */
 .restrictionItemsList {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   margin-top: 6px;
+
+  max-width: 100%;
+  min-width: 0;
 }
 
 .restrictionItemTag {
+  display: inline-flex;
+  align-items: center;
+
   padding: 3px 8px;
   background: #f5e8e8;
   color: #c00;
@@ -165,4 +171,10 @@
   border-radius: 10px;
   font-size: 10px;
   font-weight: 600;
+
+  /* ✅ 긴 텍스트에서도 폭을 넘기지 않게 */
+  max-width: 100%;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
