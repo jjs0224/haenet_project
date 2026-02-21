@@ -1,6 +1,6 @@
 image:
     repository: 690641653744.dkr.ecr.ap-northeast-2.amazonaws.com/haenet-frontend
-    tag: "sha-99beaee98a7f3cb55702f0c8f1a2dedfc6338483"
+    tag: "sha-dbe8b5f1e799c5873066a26c783170ded324e25f"
     pullPolicy: IfNotPresent
 
 ingress:
