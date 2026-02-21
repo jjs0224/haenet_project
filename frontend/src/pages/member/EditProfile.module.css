@@ -198,145 +198,91 @@
   margin-top: 16px;
 }
 
-.registerSectionTitle {
-  margin-bottom: 12px;
-}
-
-.registerSectionTitle h3 {
-  margin: 0 0 4px 0;
-  font-size: 16px;
-  font-weight: 700;
-  color: #333333;
-}
-
-.sub {
-  font-size: 12px;
-  color: #666666;
-  font-weight: 400;
-}
-
-.dislikesSection {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.dislikeTextInput {
-  flex: 1;
-  padding: 10px 12px;
+.dislikeSection .sectionHeader {
+  margin-bottom: 0;
+  background-color: #FFFFFF;
   border: 1px solid #DDDDDD;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #333333;
-  background-color: #FFFFFF;
-  outline: none;
-  transition: all 0.3s ease;
+  border-bottom: none;              /* 기존 하단 테두리 제거 */
+  border-radius: 10px 10px 0 0;
+  padding: 12px 14px;
+  position: relative;               /* ::after 기준 */
 }
 
-.dislikeTextInput::placeholder {
-  color: #999999;
-}
-
-.dislikeTextInput:focus {
-  border-color: #2E7D32;
-  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
-}
-
-.dislikeTextInput:disabled {
-  background-color: #F5F5F5;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.checkBtn {
-  padding: 10px 16px;
-  background-color: #FFFFFF;
-  border: 1px solid #2E7D32;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 13px;
-  color: #2E7D32;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  white-space: nowrap;
-}
-
-.checkBtn:hover:not(:disabled) {
+/* RegisterSectionTitle 과 동일한 하단 라인 */
+.dislikeSection .sectionHeader::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 14px;                       /* ← 좌우 공백 */
+  right: 14px;                      /* → */
+  height: 1px;
   background-color: #2E7D32;
-  border-color: #2E7D32;
-  color: #FFFFFF;
-  box-shadow: 0 2px 8px rgba(46, 125, 50, 0.3);
 }
 
-.checkBtn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  background-color: #F5F5F5;
-  color: #999999;
-  border-color: #DDDDDD;
+.dislikeSection .card {
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  margin-bottom: 0;
 }
 
 .dislikeTagsContainer {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 12px;
-  background-color: #FAFAFA;
-  border: 1px solid #DDDDDD;
-  border-radius: 8px;
-  min-height: 56px;
+  gap: 6px;
+  margin-top: 8px;
 }
 
 .dislikeTag {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: 4px;
+  padding: 5px 10px;
   background: #E8F5E9;
-  border: 1px solid #81C784;
-  border-radius: 16px;
-  font-size: 13px;
   color: #2E7D32;
+  border-radius: 14px;
+  font-size: 11px;
   font-weight: 500;
+  border: 1px solid #81C784;
 }
 
-.dislikeTag span {
-  line-height: 1;
-}
-
-.dislikeRemoveBtn {
+/* ===== Dislike Input Row ===== */
+.inputRow {
   display: flex;
+  gap: 6px;
   align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  background: #dc3545;
-  color: white;
-  border: none;
-  border-radius: 50%;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-weight: bold;
+  width: 100%;
 }
 
-.dislikeRemoveBtn:hover {
-  transform: scale(1.1);
-  box-shadow: 0 2px 8px rgba(220, 53, 69, 0.4);
-  background: #c82333;
+/* 입력창: 무조건 제일 넓게 */
+.dislikeInput {
+  flex: 1 1 0%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+/* Dislike 전용 버튼 (공용 button 절대 쓰지 말 것) */
+.dislikeAddButton {
+  flex: 0 0 auto;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 8px;
+  border: 1px solid #DDDDDD;
+  background: #FFFFFF;
+  color: #333333;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dislikeAddButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .dislikeCounter {
-  font-size: 13px;
-  color: #666666;
-  text-align: right;
-  font-weight: 500;
+  font-size: 12px;
+  color: #333333;
+  padding: 4px;
 }
