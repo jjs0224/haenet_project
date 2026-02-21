@@ -204,7 +204,7 @@ body:has(.RegisterPage) {
   left: 16px;                 /* ← 여기 */
   right: 16px;                /* → 여기 */
   height: 1px;
-  background-color: #2E7D32;
+  background-color: #7d2e2e;
 }
 
 .RegisterSectionTitle h3 {
