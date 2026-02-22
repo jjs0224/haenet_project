@@ -5,7 +5,7 @@ import os
 import sys
 import subprocess
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List
@@ -48,6 +48,13 @@ def _default_runs_root() -> Path:
     if env:
         return Path(env).expanduser().resolve()
     return (_project_root() / "AI" / "menu_assistant" / "data" / "runs").resolve()
+
+def _env_flag(name: str, default: bool) -> bool:
+    val = os.environ.get(name)
+    if val is None:
+        return default
+    return val.strip().lower() in {"1", "true", "yes", "y", "on"}
+
 
 
 def _resolve_image_arg(image_arg: str, image_base: Path) -> Path:
@@ -122,11 +129,16 @@ def _resolve_chroma_dir(data_dir: Path, chroma_dir_arg: Optional[str]) -> Path:
     Resolve chroma persist directory deterministically.
 
     Priority:
+      0) MENU_ASSISTANT_CHROMA_DIR env var
       1) --chroma-dir CLI argument
       2) <data_dir>/chroma (if exists)
       3) Windows known path fallback (only on Windows)
       4) <data_dir>/chroma (even if missing; downstream fails fast)
     """
+    env_chroma = os.environ.get("MENU_ASSISTANT_CHROMA_DIR")
+    if env_chroma:
+        return Path(env_chroma).expanduser().resolve()
+
     if chroma_dir_arg:
         return Path(chroma_dir_arg).expanduser().resolve()
 
@@ -231,8 +243,8 @@ class Step6Options:
     force_translate_all: bool = False
 
     # ✅ menu_name_en control
-    translate_menu_name: bool = False
-    force_menu_name_en: bool = False
+    translate_menu_name: bool = field(default_factory=lambda: _env_flag('MENU_ASSISTANT_TRANSLATE_MENU_NAME', False))
+    force_menu_name_en: bool = field(default_factory=lambda: _env_flag('MENU_ASSISTANT_FORCE_MENU_NAME_EN', False))
 
 
 

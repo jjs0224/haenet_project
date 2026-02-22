@@ -158,7 +158,7 @@ def _render_result_overlay(run_dir: Path, result: Any) -> Optional[Path]:
         return None
 
     def _label_from_item(it: Dict[str, Any]) -> str:
-        for key in ("menu_name_ko", "menu_name_en", "menu_name"):
+        for key in ("menu_name_en", "menu_name_ko", "menu_name"):
             val = it.get(key)
             if isinstance(val, str) and val.strip():
                 return val.strip()
@@ -178,12 +178,22 @@ def _render_result_overlay(run_dir: Path, result: Any) -> Optional[Path]:
         if pts.size == 0:
             continue
 
-        cv2.polylines(img, [pts], True, (0, 255, 0), 2)
+        rd = item.get("risk_difficulty")
+        if rd == 0:
+            color = (0, 255, 0)       # green  — SAFE
+        elif rd == 1:
+            color = (0, 255, 255)     # yellow — LOW RISK
+        elif rd == 2:
+            color = (0, 128, 255)     # orange — HIGH RISK
+        else:
+            color = (128, 128, 128)   # gray   — UNKNOWN
+
+        cv2.polylines(img, [pts], True, color, 2)
         label = _label_from_item(item)
         if label:
             x, y = int(pts[0][0][0]), int(pts[0][0][1])
             y = max(15, y - 6)
-            cv2.putText(img, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1, cv2.LINE_AA)
+            cv2.putText(img, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1, cv2.LINE_AA)
         used += 1
 
     if used == 0:
@@ -201,13 +211,12 @@ def _render_result_overlay(run_dir: Path, result: Any) -> Optional[Path]:
     return out_path
 
 
-def _upload_result_image(run_dir: Path, run_id: str, result: Any) -> Optional[Dict[str, Any]]:
+def _upload_result_image(run_id: str, overlay_path: Optional[Path]) -> Optional[Dict[str, Any]]:
     bucket = os.getenv("S3_BUCKET") or ""
     if not bucket:
         _log("[worker] S3_BUCKET not set; skip result image upload")
         return None
 
-    overlay_path = _render_result_overlay(run_dir, result)
     if overlay_path is None:
         return None
 
@@ -324,8 +333,11 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
                 if upload_info.get("presigned_url"):
                     result["rectified_image_url"] = upload_info["presigned_url"]
 
+            # render overlay once — reused by both S3 upload and base64 fallback
+            result_overlay_path = _render_result_overlay(run_dir, result)
+
             # --- S3 upload (result overlay image) ---
-            result_upload = _upload_result_image(run_dir, resolved_run_id, result)
+            result_upload = _upload_result_image(resolved_run_id, result_overlay_path)
             if result_upload:
                 artifacts = result.get("artifacts")
                 if not isinstance(artifacts, dict):
@@ -348,14 +360,9 @@ def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
 
             # --- base64 fallback: S3 업로드 실패 시 result overlay를 base64로 포함 ---
             if not result.get("result_image_url"):
-                overlay_path = run_dir / "final" / "result.jpg"
-                if not overlay_path.exists():
-                    overlay_path_candidate = _render_result_overlay(run_dir, result)
-                    if overlay_path_candidate:
-                        overlay_path = overlay_path_candidate
-                if overlay_path.exists():
+                if result_overlay_path and result_overlay_path.exists():
                     _log("[worker] S3 unavailable; embedding result image as base64")
-                    img_b64 = base64.b64encode(overlay_path.read_bytes()).decode("ascii")
+                    img_b64 = base64.b64encode(result_overlay_path.read_bytes()).decode("ascii")
                     result["result_image"] = {
                         "mime": "image/jpeg",
                         "base64": img_b64,
