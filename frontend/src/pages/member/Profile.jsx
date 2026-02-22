@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useState, useMemo, useRef } from "react";
 import { MemberContext } from "../../context/MemberContext";
+import { AuthContext } from "../../context/AuthContext";
 import { ReviewContext } from "../../context/ReviewContext";
 import { CommunityContext } from "../../context/CommunityContext";
 import ProfileSidebar from "../../components/profile/ProfileSidebar";
@@ -17,6 +18,7 @@ import styles from "./Profile.module.css";
  */
 export default function Profile() {
   const { stateMember, memberActions } = useContext(MemberContext);
+  const { stateAuth } = useContext(AuthContext);
   const { stateReview, reviewActions } = useContext(ReviewContext);
   const { stateCommunity, communityActions } = useContext(CommunityContext);
 
@@ -31,13 +33,14 @@ export default function Profile() {
 
   // ✅ me가 없고 로딩 중도 아니면 1회만 loadMe 시도
   useEffect(() => {
+    if (!stateAuth?.accessToken) return;
     if (me) return;
     if (stateMember?.loading) return;
     if (requestedMeRef.current) return;
     requestedMeRef.current = true;
     memberActions?.loadMe?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me, stateMember?.loading]);
+  }, [stateAuth?.accessToken, me, stateMember?.loading]);
 
   // ✅ 리뷰/커뮤니티는 인증(me) 준비된 뒤에 호출
   useEffect(() => {

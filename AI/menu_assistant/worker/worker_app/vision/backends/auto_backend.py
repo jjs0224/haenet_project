@@ -36,6 +36,11 @@ class AutoConfig:
     disallow_180_without_very_high_conf: bool = True
     min_conf_for_180: float = 0.995
 
+    # Allow trusting DocUNet fallback rotation even when doctr confidence is low,
+    # if objective score margin over 0deg is large enough.
+    allow_fallback_rotation_with_strong_margin: bool = True
+    min_fallback_rotation_score_margin: float = 2000.0
+
 
 class AutoBackend(RectifyBackend):
     name = "auto"
@@ -69,22 +74,6 @@ class AutoBackend(RectifyBackend):
         except Exception:
             return False
 
-        conf = orient.get("confidence", None)
-        predictor_available = bool(orient.get("predictor_available", False))
-        if (not predictor_available) or (not isinstance(conf, (int, float))):
-            return False
-
-        conf = float(conf)
-        if conf < float(self.auto_cfg.min_rotation_confidence):
-            return False
-
-        if (
-            self.auto_cfg.disallow_180_without_very_high_conf
-            and angle == 180
-            and conf < float(self.auto_cfg.min_conf_for_180)
-        ):
-            return False
-
         scored = (((orient.get("fallback", {}) or {}).get("scored", [])) or [])
         score0 = None
         score_angle = None
@@ -99,8 +88,36 @@ class AutoBackend(RectifyBackend):
             if a == angle:
                 score_angle = s
 
+        def _fallback_margin_strong() -> bool:
+            if not self.auto_cfg.allow_fallback_rotation_with_strong_margin:
+                return False
+            if angle == 0:
+                return False
+            if (score0 is None) or (score_angle is None):
+                return False
+            return (score_angle - score0) >= float(self.auto_cfg.min_fallback_rotation_score_margin)
+
+        conf = orient.get("confidence", None)
+        predictor_available = bool(orient.get("predictor_available", False))
+        if (not predictor_available) or (not isinstance(conf, (int, float))):
+            return _fallback_margin_strong()
+
+        conf = float(conf)
+        if conf < float(self.auto_cfg.min_rotation_confidence):
+            return _fallback_margin_strong()
+
+        if (
+            self.auto_cfg.disallow_180_without_very_high_conf
+            and angle == 180
+            and conf < float(self.auto_cfg.min_conf_for_180)
+        ):
+            return False
+
         if (score0 is not None) and (score_angle is not None):
             if (score_angle - score0) < float(self.auto_cfg.min_rotation_score_margin):
+                # Optional escape hatch: trust strong fallback evidence even if doctr confidence is low.
+                if _fallback_margin_strong():
+                    return True
                 return False
 
         return True
@@ -108,6 +125,7 @@ class AutoBackend(RectifyBackend):
     def rectify(self, image_bgr: np.ndarray) -> RectifyResult:
         # 1) DocUNet first
         res_u = self._docunet.rectify(image_bgr)
+        docunet_meta_first_pass = res_u.meta
 
         rotation_guard: Dict[str, Any] = {}
         if self.auto_cfg.conservative_rotation_gate:
@@ -143,12 +161,15 @@ class AutoBackend(RectifyBackend):
                     "min_rotation_score_margin": self.auto_cfg.min_rotation_score_margin,
                     "disallow_180_without_very_high_conf": self.auto_cfg.disallow_180_without_very_high_conf,
                     "min_conf_for_180": self.auto_cfg.min_conf_for_180,
+                    "allow_fallback_rotation_with_strong_margin": self.auto_cfg.allow_fallback_rotation_with_strong_margin,
+                    "min_fallback_rotation_score_margin": self.auto_cfg.min_fallback_rotation_score_margin,
                 },
                 "trigger": trig,
                 "selected": "docunet",
                 "decision": {},
                 "rotation_guard": rotation_guard,
             },
+            "docunet_meta_first_pass": docunet_meta_first_pass,
             "docunet_meta": res_u.meta,
             "dewarpnet_meta": None,
         }

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,9 +38,9 @@ class DocUNetConfig:
 
     # doctr tie preference (optional)
     prefer_doctr_when_tie: bool = False
-    tie_area_ratio: float = 0.01  # 1% 이내면 동률
+    tie_area_ratio: float = 0.01  # 1% ?대궡硫??숇쪧
 
-    # 핵심: 근소차이면 0도 유지 (이번 케이스처럼 0 vs 180이 사실상 동률인데 180이 미세하게 이기는 문제 방지)
+    # ?듭떖: 洹쇱냼李⑥씠硫?0???좎? (?대쾲 耳?댁뒪泥섎읆 0 vs 180???ъ떎???숇쪧?몃뜲 180??誘몄꽭?섍쾶 ?닿린??臾몄젣 諛⑹?)
     prefer_keep0_when_close_score_epsilon: float = 50.0
 
 
@@ -301,7 +301,7 @@ class DocUNetBackend(RectifyBackend):
             return image_bgr, meta
 
         def _textline_score(img_bgr: np.ndarray) -> float:
-            """OCR 없이 '가로 글줄 구조'를 선호하는 보조 점수."""
+            """OCR ?놁씠 '媛濡?湲以?援ъ“'瑜??좏샇?섎뒗 蹂댁“ ?먯닔."""
             try:
                 gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
                 h, w = gray.shape[:2]
@@ -332,7 +332,7 @@ class DocUNetBackend(RectifyBackend):
             best_area = float(find_meta.get("best_area", 0.0))
             tls = float(_textline_score(img))
 
-            # 안정성: best_area가 주도하고, tls는 동점 근처에서만 영향
+            # ?덉젙?? best_area媛 二쇰룄?섍퀬, tls???숈젏 洹쇱쿂?먯꽌留??곹뼢
             alpha = 1e5
             score = 1e9 + best_area + (alpha * tls)
 
@@ -369,11 +369,11 @@ class DocUNetBackend(RectifyBackend):
                     meta["uncertain_reason"] = f"low_confidence<{self.config.min_orientation_confidence}"
 
                 if pred_angle in (0, 90, 180, 270):
-                    # predictor는 "현재 방향"이라고 해석 -> inverse rotation이 correction
+                    # predictor??"?꾩옱 諛⑺뼢"?대씪怨??댁꽍 -> inverse rotation??correction
                     doctr_correction = int((-int(pred_angle)) % 360)
 
             except Exception as e:
-                # predictor가 "있지만" 실패 -> fallback
+                # predictor媛 "?덉?留? ?ㅽ뙣 -> fallback
                 meta["predictor_error"] = repr(e)
                 meta["predictor_available"] = False
                 pred_angle = None
@@ -384,11 +384,11 @@ class DocUNetBackend(RectifyBackend):
         # ---- build candidates (always include 0 first) ----
         candidates: List[Tuple[int, str]] = [(0, "keep_0deg")]
 
-        # doctr correction 후보를 0 다음에 우선 넣되, 중복 제거
+        # doctr correction ?꾨낫瑜?0 ?ㅼ쓬???곗꽑 ?ｋ릺, 以묐났 ?쒓굅
         if doctr_correction in (0, 90, 180, 270) and doctr_correction != 0:
             candidates.append((int(doctr_correction), "doctr_inverse"))
 
-        # 나머지 90/180/270 채우기
+        # ?섎㉧吏 90/180/270 梨꾩슦湲?
         for ang in (90, 180, 270):
             if all(c[0] != ang for c in candidates):
                 candidates.append((ang, f"rot{ang}"))
@@ -425,14 +425,14 @@ class DocUNetBackend(RectifyBackend):
                 score0 = float(s)
                 found0 = found
 
-            # 기본 best 선택 (동점이면 0도 우선)
+            # 湲곕낯 best ?좏깮 (?숈젏?대㈃ 0???곗꽑)
             if (s > best_score) or (s == best_score and int(ang) == 0 and best_ang != 0):
                 best_score = float(s)
                 best_ang = int(ang)
                 best_tag = tag
                 best_detail = detail
 
-        # SAFETY: 모두 실패면 회전하지 않음
+        # SAFETY: 紐⑤몢 ?ㅽ뙣硫??뚯쟾?섏? ?딆쓬
         if all_failed or best_score <= 0.0:
             meta["fallback"] = {
                 "applied": False,
@@ -450,16 +450,31 @@ class DocUNetBackend(RectifyBackend):
             )
             return image_bgr, meta
 
-        # 핵심 FIX: best가 0보다 "근소하게" 좋으면 0 유지
-        # (특히 predictor 없을 때 0/180이 사실상 동일한데 area 1~수 픽셀 차이로 180 선택되는 문제 방지)
-        if found0:
+        # ?듭떖 FIX: best媛 0蹂대떎 "洹쇱냼?섍쾶" 醫뗭쑝硫?0 ?좎?
+        # (?뱁엳 predictor ?놁쓣 ??0/180???ъ떎???숈씪?쒕뜲 area 1~???쎌? 李⑥씠濡?180 ?좏깮?섎뒗 臾몄젣 諛⑹?)
+        # Guard only for low-confidence "upright-like" predictions (0/180).
+        # If low-confidence predicts 90/270, let candidate scoring decide rotation.
+        low_conf_guard = (
+            bool(meta.get("predictor_available", False))
+            and isinstance(pred_conf, (int, float))
+            and (float(pred_conf) < float(self.config.min_orientation_confidence))
+            and (pred_angle in (0, 180))
+        )
+        if low_conf_guard:
+            best_ang = 0
+            best_tag = "keep_0deg_low_confidence_guard"
+            best_detail = {
+                "guard": "low_confidence_keep0",
+                "confidence": float(pred_conf),
+                "min_orientation_confidence": float(self.config.min_orientation_confidence),
+            }
+        elif found0:
             epsilon = float(self.config.prefer_keep0_when_close_score_epsilon)
             if (best_ang != 0) and ((best_score - score0) <= epsilon):
                 best_ang = 0
                 best_tag = "keep_0deg_close_score"
                 best_detail = {"keep0_epsilon": epsilon, "best_minus_0": float(best_score - score0)}
-
-        # 선택적: 0deg vs doctr_inverse 면적이 거의 같으면 doctr 우선 (옵션 켰을 때만)
+        # ?좏깮?? 0deg vs doctr_inverse 硫댁쟻??嫄곗쓽 媛숈쑝硫?doctr ?곗꽑 (?듭뀡 耳곗쓣 ?뚮쭔)
         if (
             bool(self.config.prefer_doctr_when_tie)
             and (doctr_correction is not None)
@@ -496,9 +511,11 @@ class DocUNetBackend(RectifyBackend):
         meta["correction_angle"] = best_ang
         meta["applied"] = bool(best_ang != 0)
 
-        # reason 문자열은 기존 meta 스타일을 유지
+        # reason 臾몄옄?댁? 湲곗〈 meta ?ㅽ??쇱쓣 ?좎?
         if meta.get("predictor_available", False):
-            if pred_angle is not None and not uncertain and pred_conf is not None and pred_conf >= float(self.config.min_orientation_confidence):
+            if low_conf_guard:
+                meta["reason"] = "doctr_low_confidence -> keep_0deg_guard"
+            elif pred_angle is not None and not uncertain and pred_conf is not None and pred_conf >= float(self.config.min_orientation_confidence):
                 meta["reason"] = "used_fallback_candidate_selection_safe"  # (기존과 동일 톤 유지)
             else:
                 meta["reason"] = "doctr_uncertain -> fallback_candidate_selection"
@@ -567,3 +584,4 @@ class DocUNetBackend(RectifyBackend):
             meta["applied"] = bool(orient_meta.get("applied"))
             meta["output_shape"] = [int(oriented.shape[0]), int(oriented.shape[1])]
             return RectifyResult(image=oriented, meta=meta)
+
