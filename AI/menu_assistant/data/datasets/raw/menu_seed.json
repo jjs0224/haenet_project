@@ -2543,14 +2543,9 @@
     "variants": [
       "김치찌개"
     ],
-    "alg_tags": [
-      "ALG_CRUSTACEANS"
-    ],
+    "alg_tags": ["ALG_SOY", "ALG_FISH"],
     "menu_description_ko": "김치찌개는 재료를 넣어 자작하게 끓인 한국식 찌개입니다.",
-    "ingredients": [
-      "Crab",
-      "Shrimp"
-    ]
+    "ingredients": ["Napa Cabbage Kimchi", "Pork", "Tofu", "Soybean", "Green Onion", "Garlic", "Red Chili Powder", "Soy Sauce", "Anchovy Broth"]
   },
   {
     "id": "rep_0180",
@@ -3473,9 +3468,9 @@
     "variants": [
       "다슬기해장국"
     ],
-    "alg_tags": [],
-    "menu_description_ko": "다슬기해장국은 국물에 재료를 넣어 끓인 탕/국 요리입니다.",
-    "ingredients": []
+    "alg_tags": ["ALG_MOLLUSCS", "ALG_SOY"],
+    "menu_description_ko": "다슬기와 아욱을 넣어 시원하게 끓인 해장국입니다.",
+    "ingredients": ["Marsh Snail", "Soybean Paste", "Marshmallow Leaf", "Chives", "Green Onion", "Garlic", "Cheongyang Chili Pepper", "Perilla Powder"]
   },
   {
     "id": "rep_0252",
@@ -4396,9 +4391,9 @@
       "돌솥비빔밥",
       "돌솔비빙밥"
     ],
-    "alg_tags": [],
-    "menu_description_ko": "돌솥비빔밥은 대표 재료를 활용한 메뉴입니다.",
-    "ingredients": []
+   "alg_tags": ["ALG_SOY", "ALG_EGG", "ALG_FISH"],
+    "menu_description_ko": "뜨거운 돌솥에 담아 마지막까지 따뜻하게 먹는 비빔밥입니다.",
+    "ingredients": ["White Rice", "Mixed Vegetables", "Namul", "Gochujang", "Sesame Oil", "Egg Yolk", "Flying Fish Roe"]
   },
   {
     "id": "rep_0321",
@@ -11200,11 +11195,9 @@
       "비빔밥",
       "비빙밥"
     ],
-    "alg_tags": [],
-    "menu_description_ko": "비빔밥은 대표 재료를 활용한 메뉴입니다.",
-    "ingredients": ["carrot",
-    "rice"
-    ]
+    "alg_tags": ["ALG_SOY", "ALG_EGG"],
+    "menu_description_ko": "다양한 나물과 고추장을 밥과 함께 비벼 먹는 요리입니다.",
+    "ingredients": ["White Rice", "Stir-fried Beef", "Soybean Sprouts", "Spinach", "Bracken", "Carrot", "Gochujang", "Sesame Oil", "Fried Egg"]
   },
   {
     "id": "rep_0838",
@@ -15685,11 +15678,9 @@
     "variants": [
       "오므라이스"
     ],
-    "alg_tags": [],
-    "menu_description_ko": "오므라이스는 대표 재료를 활용한 메뉴입니다.",
-    "ingredients": [
-      "Egg"
-    ]
+    "alg_tags": ["ALG_EGG", "ALG_MILK", "ALG_CEREALS_GLUTEN", "ALG_SOY"],
+    "menu_description_ko": "오므라이스는 볶음밥을 얇은 달걀 지단으로 감싼 요리입니다.",
+    "ingredients": ["Egg", "White Rice", "Ham", "Pork", "Onion", "Carrot", "Ketchup", "Worcestershire Sauce", "Butter", "Wheat Flour", "Roux"]
   },
   {
     "id": "rep_1173",
@@ -15731,15 +15722,9 @@
     "variants": [
       "오징어덮밥"
     ],
-    "alg_tags": [
-      "ALG_MOLLUSCS"
-    ],
-    "menu_description_ko": "오징어덮밥은 밥 위에 토핑과 소스를 올려 먹는 덮밥/컵밥 메뉴입니다.",
-    "ingredients": [
-      "Squid",
-      "Squid/Octopus",
-      "Shellfish"
-    ]
+    "alg_tags": ["ALG_MOLLUSCS", "ALG_SOY"],
+    "menu_description_ko": "매콤하게 볶은 오징어를 밥 위에 올린 요리입니다.",
+    "ingredients": ["Squid", "Onion", "Carrot", "Cabbage", "Gochujang", "Chili Paste", "Soy Sauce", "Sugar", "Red Chili Powder", "Sesame Oil", "White Rice"]
   },
   {
     "id": "rep_1176",
@@ -16880,9 +16865,9 @@
     "variants": [
       "육개장"
     ],
-    "alg_tags": [],
-    "menu_description_ko": "육개장은 대표 재료를 활용한 메뉴입니다.",
-    "ingredients": []
+   "alg_tags": ["ALG_SOY", "ALG_EGG"],
+    "menu_description_ko": "소고기와 대파 등을 푹 끓여낸 얼큰한 국물 요리입니다.",
+    "ingredients": ["Beef", "Brisket", "Bracken", "Gosari", "Mung Bean Sprouts", "Green Onion", "Taro Stems", "Red Chili Powder", "Garlic", "Soy Sauce", "Egg"]
   },
   {
     "id": "rep_1258",
@@ -18286,14 +18271,9 @@
     "variants": [
       "참치덮밥"
     ],
-    "alg_tags": [
-      "ALG_FISH"
-    ],
-    "menu_description_ko": "참치덮밥은 밥 위에 토핑과 소스를 올려 먹는 덮밥/컵밥 메뉴입니다.",
-    "ingredients": [
-      "Tuna",
-      "Fish"
-    ]
+    "alg_tags": ["ALG_FISH", "ALG_EGG", "ALG_SOY"],
+    "menu_description_ko": "참치와 채소를 고소한 양념과 함께 밥에 비벼 먹는 요리입니다.",
+    "ingredients": ["Canned Tuna", "Onion", "Pickled Radish", "Mayonnaise", "Egg", "Seaweed Flakes", "Sesame Oil", "White Rice"]
   },
   {
     "id": "rep_1366",
@@ -22696,13 +22676,9 @@
       "피자카츠",
       "돈가스"
     ],
-    "alg_tags": [
-      "ALG_CEREALS_GLUTEN"
-    ],
-    "menu_description_ko": "피자돈까스는 고기를 튀겨낸 커틀릿(카츠) 메뉴입니다.",
-    "ingredients": [
-      "Wheat"
-    ]
+    "alg_tags": ["ALG_MILK", "ALG_CEREALS_GLUTEN", "ALG_EGG", "ALG_SOY"],
+    "menu_description_ko": "돈까스 위에 피자 토핑과 치즈를 올려 구운 요리입니다.",
+    "ingredients": ["Pork", "Mozzarella Cheese", "Tomato Sauce", "Bell Pepper", "Onion", "Wheat Flour", "Breadcrumbs", "Egg", "Soy Sauce"]
   },
   {
     "id": "rep_1699",
@@ -24652,9 +24628,9 @@
     "variants": [
       "갈비탕"
     ],
-    "alg_tags": [],
-    "menu_description_ko": "갈비탕은 국물에 재료를 넣어 끓인 탕/국 요리입니다.",
-    "ingredients": []
+    "alg_tags": ["ALG_SOY"],
+    "menu_description_ko": "소갈비를 푹 고아 만든 맑고 진한 국물 요리입니다.",
+    "ingredients": ["Beef Short Ribs", "Radish", "Green Onion", "Garlic", "Onion", "Kelp", "Soy Sauce", "Glass Noodles"]
   },
   {
     "id": "rep_1853",
@@ -25805,9 +25781,9 @@
       "뚝배기불고기",
       "뜻배기불고기"
     ],
-    "alg_tags": [],
-    "menu_description_ko": "뚝배기불고기는 대표 재료를 활용한 메뉴입니다.",
-    "ingredients": []
+    "alg_tags": ["ALG_SOY"],
+    "menu_description_ko": "달콤한 간장 양념의 불고기를 뚝배기에 끓여낸 요리입니다.",
+    "ingredients": ["Beef", "Bulgogi Slice", "Glass Noodles", "Sweet Potato Starch", "Enoki Mushroom", "Onion", "Green Onion", "Soy Sauce", "Pear Juice", "Sugar"]
   },
   {
     "id": "rep_1951",
@@ -26143,16 +26119,9 @@
     "variants": [
       "된장찌개"
     ],
-    "alg_tags": [
-      "ALG_CRUSTACEANS",
-      "ALG_SOY"
-    ],
-    "menu_description_ko": "된장찌개는 재료를 넣어 자작하게 끓인 한국식 찌개입니다.",
-    "ingredients": [
-      "Soybean",
-      "Crab",
-      "Shrimp"
-    ]
+    "alg_tags": ["ALG_SOY", "ALG_FISH", "ALG_MOLLUSCS"],
+    "menu_description_ko": "된장을 풀어 구수하게 끓인 한국의 전통 찌개입니다.",
+    "ingredients": ["Soybean Paste", "Doenjang", "Tofu", "Soybean", "Zucchini", "Potato", "Onion", "Green Onion", "Anchovy", "Kelp", "Clams"]
   },
   {
     "id": "rep_1978",
@@ -26466,9 +26435,9 @@
     "variants": [
       "제육덮밥"
     ],
-    "alg_tags": [],
-    "menu_description_ko": "제육덮밥은 밥 위에 토핑과 소스를 올려 먹는 덮밥/컵밥 메뉴입니다.",
-    "ingredients": []
+   "alg_tags": ["ALG_SOY"],
+    "menu_description_ko": "돼지고기를 매콤한 양념에 볶아 밥과 함께 먹는 요리입니다.",
+    "ingredients": ["Pork", "Shoulder", "Gochujang", "Chili Paste", "Soy Sauce", "Garlic", "Onion", "Green Onion", "Sesame Oil", "Sugar", "White Rice"]
   },
   {
     "id": "rep_2004",
@@ -26844,10 +26813,8 @@
       "백미밥"
     ],
     "alg_tags": [],
-    "menu_description_ko": "공기밥은 기본으로 제공되는 흰쌀밥(한 공기) 메뉴입니다.",
-    "ingredients": [
-      "Rice"
-    ]
+    "menu_description_ko": "따끈하게 갓 지은 기본 흰쌀밥입니다.",
+    "ingredients": ["Rice", "Water"]
   },
   {
     "id": "rep_2034",
@@ -26880,15 +26847,9 @@
       "카츠",
       "포크커틀릿"
     ],
-    "alg_tags": [
-      "ALG_CEREALS_GLUTEN",
-      "ALG_EGG"
-    ],
-    "menu_description_ko": "돈까스(돈가스)는 돼지고기(또는 고기)를 빵가루에 묻혀 튀긴 커틀릿(카츠) 요리입니다.",
-    "ingredients": [
-      "Wheat",
-      "Egg"
-    ]
+   "alg_tags": ["ALG_CEREALS_GLUTEN", "ALG_EGG"],
+    "menu_description_ko": "고기를 두드려 펴서 튀겨낸 바삭한 요리입니다.",
+    "ingredients": ["Pork", "Wheat Flour", "Breadcrumbs", "Egg", "Cooking Oil", "Salt", "Black Pepper"]
   },
   {
     "id": "rep_2036",
@@ -26899,18 +26860,9 @@
       "치즈돈카츠",
       "치즈카츠"
     ],
-    "alg_tags": [
-      "ALG_MILK",
-      "ALG_CEREALS_GLUTEN",
-      "ALG_EGG"
-    ],
-    "menu_description_ko": "치즈돈까스는 돈까스 안(또는 위)에 치즈를 넣거나 올려 튀긴 카츠 메뉴입니다.",
-    "ingredients": [
-      "Cheese",
-      "Milk",
-      "Wheat",
-      "Egg"
-    ]
+    "alg_tags": ["ALG_MILK", "ALG_CEREALS_GLUTEN", "ALG_EGG"],
+    "menu_description_ko": "고기 사이에 고소한 치즈가 듬뿍 들어간 돈까스입니다.",
+    "ingredients": ["Pork", "Cheddar Cheese", "Mozzarella Cheese", "Wheat Flour", "Breadcrumbs", "Egg", "Cooking Oil"]
   },
   {
     "id": "rep_2037",
@@ -26919,18 +26871,9 @@
       "고구마치즈돈까스",
       "고구마치즈돈가스"
     ],
-    "alg_tags": [
-      "ALG_MILK",
-      "ALG_CEREALS_GLUTEN",
-      "ALG_EGG"
-    ],
-    "menu_description_ko": "고구마치즈돈까스는 고구마와 치즈를 활용한 돈까스(카츠) 메뉴입니다.",
-    "ingredients": [
-      "Cheese",
-      "Milk",
-      "Wheat",
-      "Egg"
-    ]
+   "alg_tags": ["ALG_MILK", "ALG_CEREALS_GLUTEN", "ALG_EGG"],
+    "menu_description_ko": "달콤한 고구마 무스와 치즈가 들어간 돈까스입니다.",
+    "ingredients": ["Pork", "Sweet Potato Mousse", "Mozzarella Cheese", "Wheat Flour", "Breadcrumbs", "Egg", "Milk"]
   },
   {
     "id": "rep_2038",
@@ -26941,15 +26884,9 @@
       "왕돈카츠",
       "빅돈까스"
     ],
-    "alg_tags": [
-      "ALG_CEREALS_GLUTEN",
-      "ALG_EGG"
-    ],
+    "alg_tags": ["ALG_CEREALS_GLUTEN", "ALG_EGG", "ALG_MILK", "ALG_SOY"],
     "menu_description_ko": "왕돈까스는 일반 돈까스보다 크기가 큰 카츠 메뉴입니다.",
-    "ingredients": [
-      "Wheat",
-      "Egg"
-    ]
+    "ingredients": ["Pork Loin", "Wheat Flour", "Breadcrumbs", "Egg", "Milk", "Black Pepper", "Tonkatsu Sauce", "Tomato", "Apple", "Soy Sauce"]
   },
   {
     "id": "rep_2039",
@@ -26959,9 +26896,9 @@
       "참치 김치찌개",
       "참치김치찌개"
     ],
-    "alg_tags": [],
+    "alg_tags": ["ALG_FISH", "ALG_SOY"],
     "menu_description_ko": "참치찌개는 참치와 채소 등을 넣어 끓인 찌개 요리입니다.",
-    "ingredients": []
+    "ingredients": ["Canned Tuna", "Napa Cabbage Kimchi", "Tofu", "Soybean", "Onion", "Green Onion", "Garlic", "Red Chili Powder", "Soy Sauce"]
   },
   {
     "id": "rep_2040",
@@ -26970,9 +26907,9 @@
       "김치덮밥",
       "김치 덮밥"
     ],
-    "alg_tags": [],
+    "alg_tags": ["ALG_SOY"],
     "menu_description_ko": "김치덮밥은 볶은 김치 등을 밥 위에 올려 먹는 덮밥입니다.",
-    "ingredients": []
+    "ingredients": ["Napa Cabbage Kimchi", "Pork", "Onion", "Sugar", "Soy Sauce", "Sesame Oil", "Seaweed Flakes", "White Rice"]
   },
   {
     "id": "rep_2041",
@@ -26982,9 +26919,9 @@
       "김치볶음밥",
       "철판 김치볶음밥"
     ],
-    "alg_tags": [],
+   "alg_tags": ["ALG_EGG", "ALG_SOY"],
     "menu_description_ko": "철판김치볶음밥은 뜨거운 철판에서 김치와 밥을 볶아낸 볶음밥입니다.",
-    "ingredients": []
+    "ingredients": ["Napa Cabbage Kimchi", "White Rice", "Bacon", "Ham", "Seaweed Flakes", "Fried Egg", "Cooking Oil", "Sesame Oil"]
   },
   {
     "id": "rep_2042",
@@ -26994,9 +26931,9 @@
       "알탕",
       "해물 알탕"
     ],
-    "alg_tags": [],
-    "menu_description_ko": "해물알탕은 생선 알(알)과 해물, 채소 등을 넣어 끓인 탕 요리입니다.",
-    "ingredients": []
+    "alg_tags": ["ALG_FISH", "ALG_MOLLUSCS", "ALG_CRUSTACEANS", "ALG_SOY"],
+    "menu_description_ko": "신선한 해물과 알을 넣어 얼큰하게 끓인 탕 요리입니다.",
+    "ingredients": ["Pollock Roe", "Fish Milt", "Goni", "Manila Clams", "Shrimp", "Sea Squirt", "Radish", "Crown Daisy", "Red Chili Powder", "Garlic", "Soy Sauce"]
   },
   {
     "id": "rep_2043",
@@ -27007,9 +26944,9 @@
       "양푼비빙밥",
       "양푼 비빔밥"
     ],
-    "alg_tags": [],
-    "menu_description_ko": "양푼비빔밥은 큰 그릇(양푼)에 밥과 나물, 양념 등을 넣어 비벼 먹는 비빔밥입니다.",
-    "ingredients": []
+    "alg_tags": ["ALG_SOY", "ALG_EGG"],
+    "menu_description_ko": "커다란 양푼에 나물을 넣고 넉넉하게 비벼 먹는 비빔밥입니다.",
+    "ingredients": ["White Rice", "Lettuce", "Young Summer Radish Kimchi", "Yeolmu", "Gochujang", "Sesame Oil", "Fried Egg"]
   },
   {
     "id": "rep_2044",
@@ -27018,9 +26955,7 @@
       "준두부"
       ],
     "alg_tags": ["ALG_SOY"],
-    "menu_description_ko": "부드러운 순두부를 주재료로 하여 얼큰하게 끓여낸 찌개입니다. 다양한 해산물이나 고기가 추가될 수 있습니다.",
-    "ingredients": [
-      "tofu"
-    ]
+    "menu_description_ko": "순두부는 콩을 갈아 만든 부드럽고 수분이 많은 두부로, 고소한 맛과 매끈한 식감이 특징인 한국 전통 식재료이다.",
+    "ingredients": ["Soft Tofu", "Soybean", "Manila Clams", "Chili Oil", "Egg", "Green Onion", "Garlic", "Soy Sauce", "Oyster Sauce"]
   }
 ]
