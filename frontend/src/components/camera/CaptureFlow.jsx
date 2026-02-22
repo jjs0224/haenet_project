@@ -1,31 +1,21 @@
 import LiveCameraLayer from "./LiveCameraLayer";
-import './Capture.css';
+import "./Capture.css";
 
-export default function CaptureFlow({ onDone }) {
-  
+export default function CaptureFlow({ onDone, onCancel }) {
   const handleCapture = (file) => {
     if (!file) return;
-    onDone(file);   // 촬영 즉시 부모로 전달
+    onDone?.(file);
   };
 
   return (
     <div className="capture-root">
       <LiveCameraLayer
         onCapture={handleCapture}
+        onFallback={() => {
+          // 카메라 실패/업로드로 전환 요청 시 카메라 화면을 닫아줌
+          onCancel?.();
+        }}
       />
-    </div>
-  );
-}
-
-/* =============================
-   Upload fallback screen (선택적)
-============================= */
-function UploadFallback({ onUpload, onBack }) {
-  return (
-    <div className="upload-fallback">
-      <p>카메라를 사용할 수 없습니다</p>
-      <input type="file" accept="image/*" onChange={onUpload} />
-      <button onClick={onBack}>카메라로 돌아가기</button>
     </div>
   );
 }
