@@ -33,16 +33,9 @@ export default function CommunityDetail() {
   const [editingSaving, setEditingSaving] = useState(false);
   const [activeToggling, setActiveToggling] = useState(false);
 
-  // ✅ 좋아요(하트) 상태
+  // ✅ 좋아요 상태
   const [liked, setLiked] = useState(false);
   const [heartAnim, setHeartAnim] = useState(false);
-  const [recommendCount, setRecommendCount] = useState(0);
-
-  // ✅ localStorage key (사용자별/게시글별)
-  const likeKey = useMemo(() => {
-    const uid = myMemberId ?? "guest";
-    return `community_like:${uid}:${id}`;
-  }, [myMemberId, id]);
 
   useEffect(() => {
     communityActions.fetchDetail(id);
@@ -148,9 +141,7 @@ export default function CommunityDetail() {
 
   const d = stateCommunity.detail;
 
-  const imageUrls =
-    d?.image_urls ??
-    (d?.imageUrl ? [d.imageUrl] : d?.image_url ? [d.image_url] : []);
+  const imageUrls = d?.image_urls ?? (d?.imageUrl ? [d.imageUrl] : d?.image_url ? [d.image_url] : []);
   const nickname = d?.nickname ?? "-";
   const createdAt = formatDate(d?.created_at ?? d?.createdAt);
   const recommend = d?.recommend ?? 0;
@@ -158,59 +149,36 @@ export default function CommunityDetail() {
   const ownerId = d?.member_id ?? null;
   const isMine = myMemberId != null && ownerId != null && Number(myMemberId) === Number(ownerId);
 
-  // ✅ detail이 바뀔 때 추천 수는 항상 동기화
+  // ✅ detail이 바뀔 때 liked를 무조건 false로 덮어쓰지 않게 방어
   useEffect(() => {
     if (!d) return;
-    setRecommendCount(d?.recommend ?? 0);
 
-    // ✅ 서버가 liked/recommended를 "명시적으로" 준다면 그때만 반영
+    // 서버가 liked/recommended를 "명시적으로" 준다면 그 값으로만 동기화
     const hasLikeField =
       Object.prototype.hasOwnProperty.call(d, "liked") ||
       Object.prototype.hasOwnProperty.call(d, "recommended");
 
     if (hasLikeField) {
-      const serverLiked = Boolean(d?.liked ?? d?.recommended);
-      setLiked(serverLiked);
-      try {
-        localStorage.setItem(likeKey, serverLiked ? "1" : "0");
-      } catch {}
-      return;
+      setLiked(Boolean(d?.liked ?? d?.recommended));
     }
-
-    // ✅ 서버가 like 여부를 안 주는 구조면 localStorage 값으로 유지
-    try {
-      const saved = localStorage.getItem(likeKey);
-      if (saved === "1") setLiked(true);
-      if (saved === "0") setLiked(false);
-    } catch {}
-  }, [d, likeKey]);
+    // 없으면 setLiked 안 함 → 토글로 바뀐 liked 유지
+  }, [d]);
 
   const onRecommend = async () => {
     try {
-      // ✅ communityActions.recommendToggle는 r.data를 반환함 (axios response 아님)
-      const out = await communityActions.recommendToggle(id); // { recommended, recommend } 예상
+      const out = await communityActions.recommendToggle(id);
 
-      const nowLiked = out?.recommended ?? !liked;
+      // ✅ 핵심 수정: out은 이미 data라서 out.recommended로 읽어야 함
+      const nowLiked = typeof out?.recommended === "boolean" ? out.recommended : !liked;
+
       setLiked(nowLiked);
-
-      // ✅ 카운트도 응답이 있으면 그걸로, 없으면 +/-1
-      if (typeof out?.recommend === "number") {
-        setRecommendCount(out.recommend);
-      } else {
-        setRecommendCount((prev) => Math.max(0, prev + (nowLiked ? 1 : -1)));
-      }
-
-      // ✅ 유지(재진입/새로고침에도 빨강 유지)
-      try {
-        localStorage.setItem(likeKey, nowLiked ? "1" : "0");
-      } catch {}
 
       if (nowLiked) {
         setHeartAnim(true);
         setTimeout(() => setHeartAnim(false), 600);
       }
 
-      // ✅ detail을 다시 당겨오더라도 liked가 덮어써지지 않게 위 useEffect에서 방어됨
+      // 카운트는 서버 detail 재조회로 확정 반영
       await communityActions.fetchDetail(id);
     } catch (e) {
       alert(e?.response?.data?.detail || e?.message || "Failed to recommend");
@@ -258,11 +226,7 @@ export default function CommunityDetail() {
                       style={{ cursor: activeToggling ? "not-allowed" : "pointer" }}
                     >
                       <span className={styles.activeToggleLabel}>Public</span>
-                      <div
-                        className={`${styles.toggleSwitch} ${
-                          communityActive ? styles.toggleOn : styles.toggleOff
-                        }`}
-                      >
+                      <div className={`${styles.toggleSwitch} ${communityActive ? styles.toggleOn : styles.toggleOff}`}>
                         <div className={styles.toggleKnob} />
                       </div>
                     </div>
@@ -270,24 +234,26 @@ export default function CommunityDetail() {
                 </div>
               </div>
 
+              {/* ✅ 하트 표시 영역 */}
               <div className={styles.likeRow}>
                 <button type="button" onClick={onRecommend} className={styles.likeBtn}>
                   <span
-                    className={`${styles.heartIcon} ${
-                      liked ? styles.heartActive : ""
-                    } ${heartAnim ? styles.heartBounce : ""}`}
+                    className={`${styles.heartIcon} ${liked ? styles.heartActive : ""} ${
+                      heartAnim ? styles.heartBounce : ""
+                    }`}
                   >
                     {liked ? "♥" : "♡"}
                   </span>
                 </button>
 
                 <span className={styles.likeCount}>
-                  {recommendCount > 0 ? `Like ${recommendCount}` : ""}
+                  {recommend > 0 ? `Like ${recommend}` : "Like 0"}
                 </span>
               </div>
             </div>
           </div>
 
+          {/* ===== Comments ===== */}
           <div className={styles.commentBox}>
             <div className={styles.commentHeader}>
               <h3>Comments</h3>
@@ -296,10 +262,7 @@ export default function CommunityDetail() {
                   Previous
                 </button>
                 <span>{page + 1}</span>
-                <button
-                  onClick={() => setPage((p) => p + 1)}
-                  disabled={commentLoading || comments.length < limit}
-                >
+                <button onClick={() => setPage((p) => p + 1)} disabled={commentLoading || comments.length < limit}>
                   Next
                 </button>
               </div>
@@ -331,13 +294,8 @@ export default function CommunityDetail() {
                       <div className={styles.commentNick}>{cnick}</div>
                       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                         <div className={styles.commentDate}>{cdate}</div>
-
                         {isMine && !isEditing && (
-                          <button
-                            type="button"
-                            onClick={() => startEdit(c)}
-                            className={styles.commentEditBtn}
-                          >
+                          <button type="button" onClick={() => startEdit(c)} className={styles.commentEditBtn}>
                             Edit
                           </button>
                         )}
@@ -346,20 +304,12 @@ export default function CommunityDetail() {
 
                     {isEditing ? (
                       <div className={styles.commentEditArea}>
-                        <textarea
-                          rows={3}
-                          value={editingText}
-                          onChange={(e) => setEditingText(e.target.value)}
-                        />
+                        <textarea rows={3} value={editingText} onChange={(e) => setEditingText(e.target.value)} />
                         <div className={styles.commentEditActions}>
                           <button type="button" onClick={cancelEdit} disabled={editingSaving}>
                             Cancel
                           </button>
-                          <button
-                            type="button"
-                            onClick={saveEdit}
-                            disabled={editingSaving || !editingText.trim()}
-                          >
+                          <button type="button" onClick={saveEdit} disabled={editingSaving || !editingText.trim()}>
                             {editingSaving ? "Saving..." : "save"}
                           </button>
                         </div>
