@@ -242,14 +242,15 @@ def _compute_risk_difficulty_exact(*, risk_match: Dict[str, Any]) -> int:
     """Exact-only risk_difficulty (0/1/2)
 
     Rule (user request):
-      - 2: allergy_tag_hits OR religion_hits has at least one element
+      - 2: allergy_tag_hits OR religion_hit has at least one element
       - 1: only avoid_food_hits has at least one element
       - 0: no hits
     """
     if not isinstance(risk_match, dict):
         return 0
     allergy_hits = risk_match.get("allergy_tag_hits") or []
-    religion_hits = risk_match.get("religion_hits") or []
+    religion_hit_str = risk_match.get("religion_hit") or ""
+    religion_hits = [x.strip() for x in religion_hit_str.split(",") if x.strip()] if religion_hit_str else []
     avoid_hits = risk_match.get("avoid_food_hits") or []
 
     if allergy_hits or religion_hits:
@@ -273,7 +274,8 @@ def _build_comment_exact(
 
     allergy_hits = _as_list(risk_match.get("allergy_tag_hits"))
     avoid_hits = _as_list(risk_match.get("avoid_food_hits"))
-    religion_hits = _as_list(risk_match.get("religion_hits"))
+    religion_hit_str = risk_match.get("religion_hit") or ""
+    religion_hits = [x.strip() for x in religion_hit_str.split(",") if x.strip()] if religion_hit_str else []
 
     # 1) allergy tag 기반 질문
     #    (태그->자연어 매핑은 추후 확장 가능. 지금은 태그 그대로 노출하되, 예시를 괄호로 붙이는 정도)
