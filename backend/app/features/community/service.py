@@ -336,7 +336,11 @@ async def create_step2(db: Session, total_data: Dict[str, Any]) -> Dict[str, Any
     try:
         image_bytes: bytes = await run_in_threadpool(run_orchestrator, ai_payload)
         if not image_bytes:
-            raise RuntimeError("AI returned empty bytes")
+            # AI가 빈 bytes를 반환하면 (쿼터/필터/응답 변형 등) 템플릿 쪽 fallback이 동작해야 함.
+            # 여기까지 빈 값이면 서비스 레벨에서 503으로 처리.
+            raise HTTPException(status_code=503, detail="AI returned empty bytes")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI generation failed: {type(e).__name__}: {e}")
 
@@ -344,9 +348,39 @@ async def create_step2(db: Session, total_data: Dict[str, Any]) -> Dict[str, Any
     try:
         return await persist_step2_from_image_bytes(db, total_data, image_bytes)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"community persist failed: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=f"Persist failed: {type(e).__name__}: {e}")
 
-# (이하 list/get 등 나머지 코드는 기존 그대로)
+
+# async def create_step2(db: Session, total_data: Dict[str, Any]) -> Dict[str, Any]:
+#     try:
+#         from AI.journal_assistant.pipeline.orchestrator import run_orchestrator
+#     except Exception as e:
+#         raise HTTPException(status_code=503, detail=f"AI module unavailable: {type(e).__name__}: {e}")
+#
+#     ai_payload = {
+#         "template": {
+#             "template_id": total_data.get("template_id"),
+#             "template_type": total_data.get("template_id"),
+#         },
+#         "member_id": total_data.get("member_id"),
+#         "member": total_data.get("member"),
+#         "allergy_tags": total_data.get("allergy_tags"),
+#         "reviews": total_data.get("reviews"),
+#     }
+#
+#     # 1) AI 호출
+#     try:
+#         image_bytes: bytes = await run_in_threadpool(run_orchestrator, ai_payload)
+#         if not image_bytes:
+#             raise RuntimeError("AI returned empty bytes")
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"AI generation failed: {type(e).__name__}: {e}")
+#
+#     # 2) 저장 + DB 반영
+#     try:
+#         return await persist_step2_from_image_bytes(db, total_data, image_bytes)
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"community persist failed: {type(e).__name__}: {e}")
 
 # # ---------------------------------------------------------------------
 # # 전체 조회 / 본인 조회 공용
