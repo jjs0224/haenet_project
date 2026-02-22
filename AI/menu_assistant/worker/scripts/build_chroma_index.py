@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import tarfile
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -71,6 +74,49 @@ def _chunked(n: int, size: int):
         yield i, min(i + size, n)
 
 
+def _upload_chroma_to_s3(chroma_dir: Path, s3_prefix: str) -> None:
+    """Package chroma_dir as a tarball and upload to S3."""
+    try:
+        import boto3  # type: ignore
+    except ImportError:
+        print("[S3] boto3 not available; skipping S3 upload.")
+        return
+
+    s3_uri = s3_prefix.rstrip("/")
+    if s3_uri.startswith("s3://"):
+        rest = s3_uri[5:]
+    else:
+        rest = s3_uri
+    parts = rest.split("/", 1)
+    bucket = parts[0]
+    key_prefix = parts[1] if len(parts) > 1 else ""
+    tarball_key = f"{key_prefix}/chroma.tar.gz" if key_prefix else "chroma.tar.gz"
+
+    with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        print(f"[S3] Creating tarball: {tmp_path}")
+        with tarfile.open(tmp_path, "w:gz") as tar:
+            tar.add(str(chroma_dir), arcname="chroma")
+
+        region = (
+            os.environ.get("S3_REGION")
+            or os.environ.get("AWS_REGION")
+            or os.environ.get("AWS_DEFAULT_REGION")
+        )
+        client = boto3.client("s3", region_name=region) if region else boto3.client("s3")
+
+        print(f"[S3] Uploading s3://{bucket}/{tarball_key} ...")
+        client.upload_file(tmp_path, bucket, tarball_key)
+        print(f"[S3] Upload complete: s3://{bucket}/{tarball_key}")
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+
+
 def _build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Build ChromaDB index for menu dataset")
     p.add_argument("--dataset", default=str(DEFAULT_DATASET_PATH), help="Path to dataset JSON (list of records)")
@@ -88,6 +134,12 @@ def _build_argparser() -> argparse.ArgumentParser:
     p.add_argument("--batch_size", type=int, default=DEFAULT_BATCH_SIZE, help="Insert batch size")
     p.add_argument("--rebuild", action="store_true", help="Delete existing collection before build")
     p.add_argument("--source", default="menu_dataset", help="metadata['source'] value")
+    p.add_argument(
+        "--s3_prefix",
+        default="",
+        help="S3 prefix for chroma upload after build (e.g. s3://my-bucket/ai/chroma). "
+        "Uploads chroma.tar.gz to <s3_prefix>/chroma.tar.gz.",
+    )
     return p
 
 
@@ -193,6 +245,9 @@ def main() -> None:
     print("[SAMPLE] menu_description_ko:", [m.get("menu_description_ko") for m in metas])
 
     print("[SUCCESS] Chroma index build complete.")
+
+    if args.s3_prefix:
+        _upload_chroma_to_s3(chroma_dir, args.s3_prefix)
 
 
 if __name__ == "__main__":

@@ -254,6 +254,70 @@ def _upload_result_image(run_id: str, overlay_path: Optional[Path]) -> Optional[
     }
 
 
+def _ensure_chroma_dir() -> None:
+    """Download ChromaDB tarball from S3 at worker startup if not already present locally."""
+    local = os.environ.get("MENU_ASSISTANT_CHROMA_DIR", "").strip()
+    if local:
+        p = Path(local)
+        if p.exists() and any(p.iterdir()):
+            _log(f"[worker] chroma_dir already present: {local}")
+            return
+
+    s3_prefix = os.environ.get("MENU_ASSISTANT_CHROMA_S3_PREFIX", "").strip()
+    if not s3_prefix:
+        _log("[worker] MENU_ASSISTANT_CHROMA_S3_PREFIX not set; skip chroma download.")
+        return
+
+    s3_uri = s3_prefix.rstrip("/")
+    if s3_uri.startswith("s3://"):
+        rest = s3_uri[5:]
+    else:
+        rest = s3_uri
+    parts = rest.split("/", 1)
+    bucket = parts[0]
+    key_prefix = parts[1] if len(parts) > 1 else ""
+    tarball_key = f"{key_prefix}/chroma.tar.gz" if key_prefix else "chroma.tar.gz"
+
+    local_chroma_dir = Path("/tmp/chroma")
+    tarball_path = Path("/tmp/chroma.tar.gz")
+
+    _log(f"[worker] Downloading chroma from s3://{bucket}/{tarball_key} ...")
+    try:
+        import boto3  # type: ignore
+    except ImportError:
+        _log("[worker] boto3 not available; cannot download chroma from S3.")
+        return
+
+    try:
+        region = (
+            os.environ.get("S3_REGION")
+            or os.environ.get("AWS_REGION")
+            or os.environ.get("AWS_DEFAULT_REGION")
+        )
+        client = boto3.client("s3", region_name=region) if region else boto3.client("s3")
+        client.download_file(bucket, tarball_key, str(tarball_path))
+    except Exception as e:
+        _log(f"[worker] chroma download failed: {type(e).__name__}: {e}")
+        return
+
+    _log(f"[worker] Extracting {tarball_path} -> {local_chroma_dir.parent} ...")
+    try:
+        import tarfile
+        with tarfile.open(str(tarball_path), "r:gz") as tar:
+            tar.extractall(str(local_chroma_dir.parent))
+    except Exception as e:
+        _log(f"[worker] chroma extract failed: {type(e).__name__}: {e}")
+        return
+    finally:
+        try:
+            tarball_path.unlink()
+        except Exception:
+            pass
+
+    os.environ["MENU_ASSISTANT_CHROMA_DIR"] = str(local_chroma_dir)
+    _log(f"[worker] MENU_ASSISTANT_CHROMA_DIR set to: {local_chroma_dir}")
+
+
 def _handle_task(task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     실제 AI 처리 로직 연결 지점.
@@ -377,6 +441,8 @@ def main() -> None:
     _load_secret_from_file("OPENAI_API_KEY")
     _load_secret_from_file("DB_PASSWORD")
     _load_secret_from_file("JWT_SECRET_KEY")
+
+    _ensure_chroma_dir()
 
     redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
     queue_name = os.getenv("QUEUE_NAME", "cicdex:jobs")
