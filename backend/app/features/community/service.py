@@ -462,13 +462,24 @@ def get_community_detail(db: Session, community_id: int, *, member_id: Optional[
 
     image_urls = resolve_asset_urls([img.storage_path for img in img_rows])
 
+    # 핵심 수정: 현재 로그인 유저가 이 글을 좋아요 했는지 계산
+    liked = False
+    if member_id is not None:
+        exists = db.execute(
+            select(CommunityRecommend.recommend_id).where(
+                CommunityRecommend.community_id == int(community_id),
+                CommunityRecommend.member_id == int(member_id),
+            )
+        ).scalar_one_or_none()
+        liked = exists is not None
+
     return {
         "community_id": c.community_id,
         "member_id": c.member_id,
         "nickname": nickname,
         "community_active": bool(c.community_active),
         "recommend": int(c.recommend or 0),
-        "liked": False,
+        "liked": liked,  # True/False가 정상 반영됨
         "created_at": c.create_at.isoformat() if getattr(c, "create_at", None) else None,
         "updated_at": c.update_at.isoformat() if getattr(c, "update_at", None) else None,
         "image_urls": image_urls,
