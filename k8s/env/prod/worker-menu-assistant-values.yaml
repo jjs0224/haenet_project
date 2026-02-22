@@ -20,7 +20,6 @@ config:
     S3_REGION: ap-northeast-2
     MENU_ASSISTANT_RUNS_ROOT: /app/AI/menu_assistant/data/runs
     MENU_ASSISTANT_CHROMA_S3_PREFIX: s3://haenet-s3-project/ai/chroma/
-    MENU_ASSISTANT_MENU_INDEX_S3_URI: s3://haenet-s3-project/ai/json/menu_seed_with_alg_tags_variants_v3.json
 
 secrets:
     enabled: false
